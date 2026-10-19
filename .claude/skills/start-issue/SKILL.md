@@ -28,7 +28,10 @@ Nom : `issue-<numero>-<court-descriptif>`
 - Si la branche existe déjà (`git branch --list`), proposer de s'y placer au lieu de la recréer.
 - `git checkout -b <branche>`
 
-## 4. Passer l'issue à "In progress"
+## 4. Assigner l'issue à l'utilisateur
+`gh issue edit <n> --add-assignee "@me"` : assigne l'issue au compte `gh` connecté (celui qui lance le skill). Les autres assignés sont conservés. Si déjà assignée à cet utilisateur, rien à faire.
+
+## 5. Passer l'issue à "In progress"
 Repose sur GitHub Projects v2.
 1. Trouver le projet et l'item :
    `gh issue view <n> --json projectItems` donne le projet lié (numéro, titre) et l'`id` de l'item.
@@ -39,7 +42,7 @@ Repose sur GitHub Projects v2.
 4. `gh project item-edit --project-id <id> --id <item-id> --field-id <status-field-id> --single-select-option-id <option-id>`
 5. Relire l'état pour confirmer.
 
-Si les commandes `gh project` échouent avec `missing required scopes`, dire à l'utilisateur de lancer `! gh auth refresh -s project` (puis relancer l'étape 4). Les étapes 1 à 3 restent valables.
+Si les commandes `gh project` échouent avec `missing required scopes`, dire à l'utilisateur de lancer `! gh auth refresh -s project` (puis relancer l'étape 5). Les étapes 1 à 3 restent valables.
 
-## 5. Rapport (concis)
-Numéro et titre de l'issue, branche créée, statut du projet. Signaler toute étape non faite (scope manquant, issue hors projet).
+## 6. Rapport (concis)
+Numéro et titre de l'issue, branche créée, assigné, statut du projet. Signaler toute étape non faite (scope manquant, issue hors projet).
