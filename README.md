@@ -33,6 +33,14 @@ npm install
 cd ..
 ```
 
+### Hooks Git (obligatoire avant le premier commit)
+
+Un hook `pre-commit` (dans `.githooks/`) ajoute automatiquement une version (numéro, date, auteur, branche) à l'historique en bas de `SPECS.md` quand un commit modifie ce fichier. Git ne l'active pas tout seul. C'est fait automatiquement par `npm install` dans `frontend/` (script `prepare`) et à chaque session Claude Code (hook `SessionStart`). Sinon, à faire une fois après chaque clone :
+
+```powershell
+git config core.hooksPath .githooks
+```
+
 ## Lancement
 
 Deux terminaux sont nécessaires.

@@ -1,0 +1,77 @@
+#!/bin/sh
+# Pre-commit : si SPECS.md est modifié par le commit (hors historique des versions),
+# ajoute une entrée (version, date, auteur, branche) dans l'historique en bas du fichier,
+# puis l'ajoute au commit en cours.
+# Actif pour tous les commits (utilisateur ou Claude) via `git config core.hooksPath .githooks`.
+
+root=$(git rev-parse --show-toplevel) || exit 0
+specs="$root/SPECS.md"
+[ -f "$specs" ] || exit 0
+
+# Contenu des specs sans la section « Historique des versions » (CR retirés)
+strip_history() {
+  tr -d '\r' | awk '
+    /<summary>Historique des versions<\/summary>/ { skip = 1 }
+    !skip { print }
+    skip && /<\/details>/ { skip = 0 }
+  '
+}
+
+# Rien à faire si SPECS.md n'est pas dans les changements indexés de ce commit
+git diff --cached --quiet -- SPECS.md && exit 0
+
+# Si le fichier existe déjà dans HEAD, ne rien faire si seul l'historique diffère
+if git cat-file -e HEAD:SPECS.md 2>/dev/null; then
+  old=$(git show HEAD:SPECS.md | strip_history)
+  new=$(git show :SPECS.md | strip_history)
+  [ "$old" = "$new" ] && exit 0
+fi
+
+date_now=$(date '+%Y-%m-%d %H:%M')
+author=$(git config user.name)
+branch=$(git branch --show-current)
+[ -n "$branch" ] || branch="(detached HEAD)"
+
+# Un '|' casserait le tableau Markdown
+author=$(printf '%s' "$author" | tr '|' '/')
+branch=$(printf '%s' "$branch" | tr '|' '/')
+
+# Fins de ligne du fichier (CRLF ou LF)
+cr=""
+if head -n 1 "$specs" | grep -q "$(printf '\r')"; then cr=$(printf '\r'); fi
+
+# Prochain numéro = plus grand numéro de version existant + 1
+last=$(grep -E '^\| *[0-9]+ *\|' "$specs" | sed -E 's/^\| *([0-9]+) *\|.*/\1/' | sort -n | tail -n 1)
+version=$(( ${last:-0} + 1 ))
+row="| $version | $date_now | $author | $branch |$cr"
+
+tmp=$(mktemp) || exit 1
+
+if grep -q '<summary>Historique des versions</summary>' "$specs"; then
+  # Insère la ligne après la dernière ligne de tableau de la section
+  awk -v row="$row" '
+    { lines[NR] = $0 }
+    /<summary>Historique des versions<\/summary>/ { inhist = 1 }
+    inhist && /^\|/ { lastrow = NR }
+    END {
+      for (i = 1; i <= NR; i++) {
+        print lines[i]
+        if (i == lastrow) print row
+      }
+    }
+  ' "$specs" > "$tmp"
+else
+  # Pas de section : on la crée en bas du fichier
+  {
+    cat "$specs"
+    printf '\n<details>%s\n<summary>Historique des versions</summary>%s\n\n' "$cr" "$cr"
+    printf '| Version | Date | Auteur | Branche |%s\n|---------|------|--------|---------|%s\n' "$cr" "$cr"
+    printf '%s\n\n</details>%s\n' "$row" "$cr"
+  } > "$tmp"
+fi
+
+cat "$tmp" > "$specs"
+rm -f "$tmp"
+git add "$specs"
+echo "pre-commit: SPECS.md -> version $version ($branch)"
+exit 0

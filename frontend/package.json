@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || echo hooksPath non configure (hors depot Git ?)",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

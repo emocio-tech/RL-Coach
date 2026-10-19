@@ -39,6 +39,11 @@ RL-Coach/
 - Front : `cd frontend; npm install; npm run dev` (port 5173, proxy `/api` vers 8000)
 - Tests back : `cd backend; pytest`
 
+## Hooks Git
+- `.githooks/pre-commit` : si un commit modifie `SPECS.md` (hors historique), ajoute une ligne (version, date, auteur, branche) dans l'historique des versions en bas du fichier et la met dans le commit. Ne jamais éditer cet historique à la main ni via `/define-specs`.
+- Activation : `git config core.hooksPath .githooks`, faite automatiquement par `npm install` dans `frontend/` (script `prepare`) et au démarrage de chaque session Claude Code (hook `SessionStart` de `.claude/settings.json`). Vérifier avec `git config core.hooksPath` avant de committer ; si vide, l'exécuter.
+- Les scripts de `.githooks/` doivent rester en fins de ligne LF (`.gitattributes`).
+
 ## Conventions
 - Code, noms de variables et commits en anglais ; échanges en français.
 - Ne jamais committer de fichier `.replay` ni le contenu de `data/replays/`.
