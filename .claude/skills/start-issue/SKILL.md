@@ -35,7 +35,8 @@ Nom : `issue-<numero>-<court-descriptif>`
 Repose sur GitHub Projects v2.
 1. Trouver le projet et l'item :
    `gh issue view <n> --json projectItems` donne le projet lié (numéro, titre) et l'`id` de l'item.
-2. Si l'issue n'est dans aucun projet : le signaler, ne pas l'ajouter sans demande.
+2. Si l'issue n'est dans aucun projet, l'ajouter au projet « Backlog RL Coach » (n°11, owner `emocio-tech`) :
+   `gh project item-add 11 --owner emocio-tech --url <url de l'issue> --format json` ; l'`id` retourné est l'id de l'item. Le signaler dans le rapport.
 3. Récupérer les ids :
    - `gh project field-list <projet> --owner <owner> --format json` : id du champ `Status` et id de l'option `In progress`.
    - `gh project view <projet> --owner <owner> --format json` : id du projet.
@@ -45,4 +46,4 @@ Repose sur GitHub Projects v2.
 Si les commandes `gh project` échouent avec `missing required scopes`, dire à l'utilisateur de lancer `! gh auth refresh -s project` (puis relancer l'étape 5). Les étapes 1 à 3 restent valables.
 
 ## 6. Rapport (concis)
-Numéro et titre de l'issue, branche créée, assigné, statut du projet. Signaler toute étape non faite (scope manquant, issue hors projet).
+Numéro et titre de l'issue, branche créée, assigné, statut du projet. Signaler toute étape non faite (scope manquant) et si l'issue a été ajoutée au projet.
