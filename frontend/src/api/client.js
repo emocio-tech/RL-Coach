@@ -12,11 +12,3 @@ export function uploadReplay(file) {
   form.append("file", file);
   return request("/replays", { method: "POST", body: form });
 }
-
-export function listReplays() {
-  return request("/replays");
-}
-
-export function getReplayStats(id) {
-  return request(`/replays/${id}/stats`);
-}

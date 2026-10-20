@@ -11,8 +11,8 @@ export default function ReplayUpload({ onUploaded }) {
     setLoading(true);
     setError(null);
     try {
-      await uploadReplay(file);
-      onUploaded?.();
+      const result = await uploadReplay(file);
+      onUploaded?.(result);
     } catch (err) {
       setError(err.message);
     } finally {
