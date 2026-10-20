@@ -5,16 +5,32 @@ from app.schemas.replay import (
     BallTrack,
     Heatmap,
     MatchStats,
-    PlayerData,
+    BoostStats,
+    Demolitions,
+    MapFile,
+    PlayerFullStats,
+    PlayerMap,
     PlayerStats,
     PlayerTrack,
-    ReplayData,
+    StatsFile,
 )
 from app.services.parser import ReplayParseError
 
 CAR = "Archetypes.Car.Car_Default"
 BALL = "Archetypes.Ball.Ball_Default"
 BOOST = "Archetypes.CarComponents.CarComponent_Boost"
+
+PICKUP_ATTRIBUTE = "TAGame.VehiclePickup_TA:NewReplicatedPickupData"
+DEMOLISH_ATTRIBUTES = (
+    "TAGame.Car_TA:ReplicatedDemolishExtended",
+    "TAGame.Car_TA:ReplicatedDemolish",
+)
+DEMOLISH_KEYS = ("DemolishExtended", "Demolish")
+MATCH_DEMOLISHES = "TAGame.PRI_TA:MatchDemolishes"
+
+PICKUP_UNAVAILABLE = 255
+BIG_PAD_MIN_RESPAWN = 7.0
+DEMOLISH_DEDUP_WINDOW = 3.0
 
 GRID_X = 20
 GRID_Y = 26
@@ -32,6 +48,18 @@ class _State:
         self.boost_car = {}
         self.boost_amount = {}
         self.rigid = {}
+        self.now = 0.0
+        self.level_weighted = {}
+        self.level_time = {}
+        self.consumed = {}
+        self.small_pads = {}
+        self.big_pads = {}
+        self.pad_last = {}
+        self.pending_pickups = {}
+        self.demolitions = []
+        self.demolish_last = {}
+        self.pri_counter = {}
+        self.named_counter = {}
 
     def add_actor(self, actor_id, name):
         self._forget(actor_id)
@@ -42,7 +70,15 @@ class _State:
         elif name == BOOST:
             self.boosts.add(actor_id)
 
+    def _snapshot_counter(self, actor_id):
+        name = self.pri_name.get(actor_id)
+        if name is not None and actor_id in self.pri_counter:
+            self.named_counter[name] = self.pri_counter[actor_id]
+
     def _forget(self, actor_id):
+        self._snapshot_counter(actor_id)
+        self.pri_counter.pop(actor_id, None)
+        self.pad_last.pop(actor_id, None)
         self.cars.discard(actor_id)
         if self.ball == actor_id:
             self.ball = None
@@ -67,6 +103,7 @@ class _State:
             value = attribute.get("String")
             if value is not None:
                 self.pri_name[actor_id] = value
+                self._snapshot_counter(actor_id)
         elif name == "TAGame.CarComponent_TA:Vehicle":
             target = _active_actor(attribute)
             if actor_id in self.boosts and target is not None:
@@ -74,7 +111,17 @@ class _State:
         elif name == "TAGame.CarComponent_Boost_TA:ReplicatedBoost":
             value = (attribute.get("ReplicatedBoost") or {}).get("boost_amount")
             if actor_id in self.boosts and value is not None:
+                self._on_boost_amount(actor_id, value)
                 self.boost_amount[actor_id] = value
+        elif name == PICKUP_ATTRIBUTE:
+            self._on_pickup(actor_id, attribute)
+        elif name in DEMOLISH_ATTRIBUTES:
+            self._on_demolish(attribute)
+        elif name == MATCH_DEMOLISHES:
+            value = attribute.get("Int")
+            if isinstance(value, int) and not isinstance(value, bool):
+                self.pri_counter[actor_id] = value
+                self._snapshot_counter(actor_id)
         if "RigidBody" in attribute and (actor_id in self.cars or actor_id == self.ball):
             body = attribute["RigidBody"] or {}
             location = body.get("location")
@@ -86,6 +133,104 @@ class _State:
             if owner == car_id and comp_id in self.boost_amount:
                 return round(self.boost_amount[comp_id] / 255 * 100)
         return None
+
+    def car_player(self, car_id):
+        pri = self.car_pri.get(car_id)
+        if pri is None:
+            return None
+        return self.pri_name.get(pri)
+
+    def accumulate_levels(self, delta):
+        if not delta or delta <= 0:
+            return
+        for comp_id, owner in self.boost_car.items():
+            amount = self.boost_amount.get(comp_id)
+            if amount is None:
+                continue
+            player = self.car_player(owner)
+            if player is None:
+                continue
+            self.level_weighted[player] = (
+                self.level_weighted.get(player, 0.0) + amount / 255 * 100 * delta
+            )
+            self.level_time[player] = self.level_time.get(player, 0.0) + delta
+
+    def _count_pad(self, player, big):
+        target = self.big_pads if big else self.small_pads
+        target[player] = target.get(player, 0) + 1
+
+    def flush_pickups(self):
+        for player, _started in self.pending_pickups.values():
+            self._count_pad(player, False)
+        self.pending_pickups.clear()
+
+    def _on_boost_amount(self, comp_id, value):
+        car_id = self.boost_car.get(comp_id)
+        if car_id is None:
+            return
+        new_level = value / 255 * 100
+        previous = self.boost_amount.get(comp_id)
+        if previous is not None:
+            previous_level = previous / 255 * 100
+            if new_level < previous_level:
+                player = self.car_player(car_id)
+                if player is not None:
+                    self.consumed[player] = (
+                        self.consumed.get(player, 0.0) + previous_level - new_level
+                    )
+
+    def _on_pickup(self, pad_id, attribute):
+        data = attribute.get("PickupNew")
+        if not isinstance(data, dict):
+            return
+        instigator = data.get("instigator")
+        picked_up = data.get("picked_up")
+        if picked_up == PICKUP_UNAVAILABLE:
+            pending = self.pending_pickups.pop(pad_id, None)
+            if pending is not None:
+                player, started = pending
+                self._count_pad(player, self.now - started >= BIG_PAD_MIN_RESPAWN)
+            return
+        if (
+            not isinstance(instigator, int)
+            or isinstance(instigator, bool)
+            or instigator < 0
+        ):
+            return
+        key = (picked_up, instigator)
+        if self.pad_last.get(pad_id) == key:
+            return
+        self.pad_last[pad_id] = key
+        player = self.car_player(instigator)
+        if player is None:
+            return
+        previous = self.pending_pickups.pop(pad_id, None)
+        if previous is not None:
+            self._count_pad(previous[0], False)
+        self.pending_pickups[pad_id] = (player, self.now)
+
+    def _on_demolish(self, attribute):
+        data = None
+        for key in DEMOLISH_KEYS:
+            if isinstance(attribute.get(key), dict):
+                data = attribute[key]
+                break
+        if data is None or data.get("self_demolish"):
+            return
+        attacker_pri = _actor_id(data.get("attacker_pri"))
+        victim_car = _actor_id(data.get("victim"))
+        if attacker_pri is None or victim_car is None:
+            return
+        attacker = self.pri_name.get(attacker_pri)
+        victim = self.car_player(victim_car)
+        if attacker is None or victim is None or attacker == victim:
+            return
+        key = (attacker_pri, victim_car)
+        last = self.demolish_last.get(key)
+        if last is not None and self.now - last < DEMOLISH_DEDUP_WINDOW:
+            return
+        self.demolish_last[key] = self.now
+        self.demolitions.append((attacker, victim))
 
     def player_sample(self, name):
         for car_id in self.cars:
@@ -137,7 +282,17 @@ def _active_actor(attribute):
     return actor
 
 
-def build_replay_data(replay_id: str, original_filename: str, raw: dict) -> ReplayData:
+def _actor_id(value):
+    if isinstance(value, dict):
+        value = value.get("actor")
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
+def build_match_files(
+    replay_id: str, original_filename: str, raw: dict
+) -> tuple[StatsFile, MapFile]:
     properties = raw.get("properties") or {}
     player_stats = properties.get("PlayerStats") or []
     frames = ((raw.get("network_frames") or {}).get("frames")) or []
@@ -185,25 +340,69 @@ def build_replay_data(replay_id: str, original_filename: str, raw: dict) -> Repl
     player_rows = {name: [] for name in names}
     ball_rows = []
 
+    def process_frame(frame):
+        state.now = frame["time"]
+        state.accumulate_levels(frame.get("delta"))
+        for actor in frame.get("new_actors") or []:
+            state.add_actor(actor["actor_id"], object_name(actor.get("object_id")))
+        for actor in frame.get("updated_actors") or []:
+            name = object_name(actor.get("object_id"))
+            if name is None and "RigidBody" not in (actor.get("attribute") or {}):
+                continue
+            state.update_actor(actor["actor_id"], name, actor.get("attribute"))
+        for actor_id in frame.get("deleted_actors") or []:
+            state.delete_actor(actor_id)
+
     for k in range(n_steps):
         t = k * step
         while frame_index < len(frames) and frames[frame_index]["time"] - t0 <= t + 1e-9:
-            frame = frames[frame_index]
+            process_frame(frames[frame_index])
             frame_index += 1
-            for actor in frame.get("new_actors") or []:
-                state.add_actor(actor["actor_id"], object_name(actor.get("object_id")))
-            for actor in frame.get("updated_actors") or []:
-                name = object_name(actor.get("object_id"))
-                if name is None and "RigidBody" not in (actor.get("attribute") or {}):
-                    continue
-                state.update_actor(actor["actor_id"], name, actor.get("attribute"))
-            for actor_id in frame.get("deleted_actors") or []:
-                state.delete_actor(actor_id)
 
         times.append(round(t, 2))
         for name in names:
             player_rows[name].append(state.player_sample(name))
         ball_rows.append(state.ball_sample())
+
+    while frame_index < len(frames):
+        process_frame(frames[frame_index])
+        frame_index += 1
+    state.flush_pickups()
+    for pri_id in list(state.pri_counter):
+        state._snapshot_counter(pri_id)
+
+    duration = properties.get("TotalSecondsPlayed")
+    full_players = []
+    for stats_item in stats_list:
+        pname = stats_item.name
+        known_time = state.level_time.get(pname, 0.0)
+        average_level = (
+            round(state.level_weighted.get(pname, 0.0) / known_time, 1)
+            if known_time > 0
+            else None
+        )
+        consumed_per_minute = None
+        if isinstance(duration, (int, float)) and duration > 0:
+            consumed_per_minute = round(
+                state.consumed.get(pname, 0.0) / (duration / 60), 1
+            )
+        received = sum(1 for _a, victim in state.demolitions if victim == pname)
+        if pname in state.named_counter:
+            inflicted = state.named_counter[pname]
+        else:
+            inflicted = sum(1 for a, _v in state.demolitions if a == pname)
+        full_players.append(
+            PlayerFullStats(
+                **stats_item.model_dump(),
+                demolitions=Demolitions(inflicted=inflicted, received=received),
+                boost=BoostStats(
+                    small_pads=state.small_pads.get(pname, 0),
+                    big_pads=state.big_pads.get(pname, 0),
+                    consumed_per_minute=consumed_per_minute,
+                    average_level=average_level,
+                ),
+            )
+        )
 
     players = []
     for stats_item in stats_list:
@@ -216,8 +415,9 @@ def build_replay_data(replay_id: str, original_filename: str, raw: dict) -> Repl
             iy = min(GRID_Y - 1, max(0, int((row[1] - Y_MIN) / (Y_MAX - Y_MIN) * GRID_Y)))
             counts[ix][iy] += 1
         players.append(
-            PlayerData(
-                stats=stats_item,
+            PlayerMap(
+                name=stats_item.name,
+                team=stats_item.team,
                 heatmap=Heatmap(counts=counts),
                 track=PlayerTrack(
                     t=times,
@@ -237,10 +437,11 @@ def build_replay_data(replay_id: str, original_filename: str, raw: dict) -> Repl
         z=[r[2] if r else None for r in ball_rows],
     )
 
-    return ReplayData(
-        id=replay_id,
+    stats_file = StatsFile(
+        replay_id=replay_id,
         original_filename=original_filename,
         match=match,
-        players=players,
-        ball=ball,
+        players=full_players,
     )
+    map_file = MapFile(replay_id=replay_id, players=players, ball=ball)
+    return stats_file, map_file

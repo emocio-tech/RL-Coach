@@ -1,5 +1,5 @@
-import os
 import re
+import shutil
 import uuid
 from pathlib import Path
 
@@ -34,21 +34,59 @@ async def save_replay(file: UploadFile) -> UploadResult:
 
     raw = await run_in_threadpool(parser.parse_replay, content)
 
-    replay_id = uuid.uuid4().hex
+    properties = (raw.get("properties") if isinstance(raw, dict) else None) or {}
+    replay_id = str(properties.get("Id") or uuid.uuid4().hex)
     original_filename = re.sub(r"[\x00-\x1f\x7f]", "", Path(name).name)[:255]
 
-    data = await run_in_threadpool(
-        stats.build_replay_data, replay_id, original_filename, raw
+    stats_file, map_file = await run_in_threadpool(
+        stats.build_match_files, replay_id, original_filename, raw
     )
 
-    config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
-    final_path = config.GAMES_DIR / f"{replay_id}{config.STORED_EXTENSION}"
-    tmp_path = config.GAMES_DIR / f"{replay_id}{config.STORED_EXTENSION}.tmp"
-    try:
-        tmp_path.write_text(data.model_dump_json(), encoding="utf-8")
-        os.replace(tmp_path, final_path)
-    except BaseException:
-        tmp_path.unlink(missing_ok=True)
-        raise
+    folder_id = await run_in_threadpool(
+        _write_match_folder, _folder_name(properties, replay_id), stats_file, map_file
+    )
+    return UploadResult(id=folder_id)
 
-    return UploadResult(id=replay_id)
+
+def _sanitize(value, fallback: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9._-]", "_", str(value)) if value else ""
+    return text.strip(".")[:64] or fallback
+
+
+def _folder_name(properties: dict, replay_id: str) -> str:
+    map_name = _sanitize(properties.get("MapName"), "UnknownMap")
+    match_type = _sanitize(properties.get("MatchType"), "Unknown")
+    team_size = properties.get("TeamSize")
+    size_part = ""
+    if isinstance(team_size, int) and not isinstance(team_size, bool):
+        size_part = f"-{team_size}v{team_size}"
+    return f"{map_name}_{match_type}{size_part}_{_sanitize(replay_id, 'replay')}"
+
+
+def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
+    config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
+    games_dir = config.GAMES_DIR.resolve()
+    tmp = config.GAMES_DIR / f".tmp-{uuid.uuid4().hex}"
+    try:
+        tmp.mkdir()
+        (tmp / config.STATS_FILENAME).write_text(
+            stats_file.model_dump_json(), encoding="utf-8"
+        )
+        (tmp / config.MAP_FILENAME).write_text(
+            map_file.model_dump_json(), encoding="utf-8"
+        )
+        for attempt in range(1, 1001):
+            candidate = folder_name if attempt == 1 else f"{folder_name}_{attempt}"
+            final = config.GAMES_DIR / candidate
+            if final.resolve().parent != games_dir:
+                raise OSError("Invalid replay folder path")
+            try:
+                tmp.rename(final)
+                return candidate
+            except OSError:
+                if not final.exists():
+                    raise
+        raise OSError("Could not find a free replay folder name")
+    except BaseException:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise

@@ -42,12 +42,6 @@ class Heatmap(BaseModel):
     counts: list[list[int]]
 
 
-class PlayerData(BaseModel):
-    stats: PlayerStats
-    heatmap: Heatmap
-    track: PlayerTrack
-
-
 class BallTrack(BaseModel):
     t: list[float]
     x: list[float | None]
@@ -55,9 +49,38 @@ class BallTrack(BaseModel):
     z: list[float | None]
 
 
-class ReplayData(BaseModel):
-    id: str
+class Demolitions(BaseModel):
+    inflicted: int = 0
+    received: int = 0
+
+
+class BoostStats(BaseModel):
+    small_pads: int = 0
+    big_pads: int = 0
+    consumed_per_minute: float | None = None
+    average_level: float | None = None
+
+
+class PlayerFullStats(PlayerStats):
+    demolitions: Demolitions
+    boost: BoostStats
+
+
+class StatsFile(BaseModel):
+    replay_id: str
     original_filename: str
     match: MatchStats
-    players: list[PlayerData]
+    players: list[PlayerFullStats]
+
+
+class PlayerMap(BaseModel):
+    name: str
+    team: int
+    heatmap: Heatmap
+    track: PlayerTrack
+
+
+class MapFile(BaseModel):
+    replay_id: str
+    players: list[PlayerMap]
     ball: BallTrack
