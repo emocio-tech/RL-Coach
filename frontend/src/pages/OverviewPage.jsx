@@ -69,7 +69,7 @@ function Recap({ match, player }) {
   );
 }
 
-function TeamTable({ team, players, selected }) {
+function TeamTable({ team, players, selected, onSelectPlayer }) {
   const goals = players.reduce((sum, p) => sum + p.stats.goals, 0);
   return (
     <div className={`table-wrap ${team === 0 ? "blue" : "orange"}`}>
@@ -87,7 +87,18 @@ function TeamTable({ team, players, selected }) {
         </thead>
         <tbody>
           {players.map(({ stats }) => (
-            <tr key={stats.name} className={stats.name === selected ? "selected" : undefined}>
+            <tr
+              key={stats.name}
+              className={stats.name === selected ? "selected" : undefined}
+              tabIndex={0}
+              onClick={() => onSelectPlayer(stats.name)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectPlayer(stats.name);
+                }
+              }}
+            >
               <th scope="row">{stats.name}</th>
               <td className="strong">{stats.score}</td>
               <td>{stats.goals}</td>
@@ -165,7 +176,7 @@ function PlayerDetails({ player }) {
   );
 }
 
-export default function OverviewPage({ report, selectedPlayer }) {
+export default function OverviewPage({ report, selectedPlayer, onSelectPlayer }) {
   const { match, players } = report;
   const player = players.find((p) => p.stats.name === selectedPlayer) ?? null;
   return (
@@ -180,6 +191,7 @@ export default function OverviewPage({ report, selectedPlayer }) {
             team={team}
             players={players.filter((p) => p.stats.team === team)}
             selected={selectedPlayer}
+            onSelectPlayer={onSelectPlayer}
           />
         ))}
       </section>
