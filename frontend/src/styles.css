@@ -141,6 +141,8 @@ html { scroll-padding-top: 90px; }
 
 .mine { display: flex; flex-direction: column; gap: 16px; }
 .mine-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.car-pill { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--blue); border-radius: 999px; padding: 6px 18px; font-size: 16px; font-weight: 700; }
+.car-pill-label { font-weight: 500; color: var(--muted-2); }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; }
 .stat-card { display: flex; flex-direction: column; gap: 4px; background: var(--bg); border: 3px solid var(--blue); border-radius: 18px; padding: 16px; }
 .stat-label { font-size: 13px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -150,11 +152,12 @@ html { scroll-padding-top: 90px; }
 .table-wrap { overflow-x: auto; border-radius: 18px; border: 3px solid var(--team); }
 .table-wrap.blue { --team: var(--blue); --ink: #fff; }
 .table-wrap.orange { --team: var(--orange); --ink: var(--bg); }
-table { width: 100%; min-width: 640px; table-layout: fixed; border-collapse: collapse; font-size: 16px; }
+table { width: 100%; min-width: 800px; table-layout: fixed; border-collapse: collapse; font-size: 16px; }
 caption { caption-side: top; text-align: left; padding: 12px 16px; background: var(--team); color: var(--ink); font-family: var(--font-title); font-size: 18px; text-transform: uppercase; }
 thead tr { background: var(--bar); color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
 th, td { padding: 12px 16px; text-align: right; }
-th:first-child, td:first-child { text-align: left; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+td:nth-child(2) { white-space: nowrap; }
 thead th { font-weight: 500; }
 tbody tr { border-top: 1px solid var(--panel-edge); cursor: pointer; }
 @media (hover: hover) {

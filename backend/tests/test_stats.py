@@ -6,9 +6,10 @@ from app.services import stats
 from app.services.parser import ReplayParseError
 from tests.conftest import (
     BOOST_A, BOOST_B, CAR_A, CAR_B, PAD_SMALL, PAD_SPARE, PRI_A, PRI_B,
-    OBJ_CAR, OBJ_MATCH_DEMOLISHES, OBJ_PAWN_PRI, OBJ_PRI_NAME, OBJ_REP_BOOST, OBJ_RBSTATE,
+    OBJ_CAR, OBJ_LOADOUTS, OBJ_MATCH_DEMOLISHES, OBJ_PAWN_PRI, OBJ_PRI_NAME, OBJ_REP_BOOST, OBJ_RBSTATE,
     ROT_B,
     add_frame, add_update, announce_pad, demolish, pad_object_id, pickup, release, set_boost,
+    set_loadout,
 )
 
 N_SAMPLES = 11  # 2.0 s at 5 Hz, inclusive
@@ -225,6 +226,54 @@ def test_build_match_files_unknown_pri_name_ignored(fake_raw):
     ]
     assert [p.name for p in _stats(fake_raw).players] == ["Alice", "Bob"]
     assert [p.name for p in _map(fake_raw).players] == ["Alice", "Bob"]
+
+
+def test_build_match_files_car_is_in_game_name_of_loadout_body(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, blue=4284, orange=4284)
+    set_loadout(fake_raw, 0, PRI_B, blue=23, orange=23)
+    data = _stats(fake_raw)
+    assert _player(data, "Alice").car == "Fennec"
+    assert _player(data, "Bob").car == "Octane"
+
+
+def test_build_match_files_car_follows_the_loadout_of_the_player_team(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, blue=23, orange=4284)
+    set_loadout(fake_raw, 0, PRI_B, blue=23, orange=4284)
+    data = _stats(fake_raw)
+    assert _player(data, "Alice").car == "Octane"  # team 0 = blue
+    assert _player(data, "Bob").car == "Fennec"  # team 1 = orange
+
+
+def test_build_match_files_car_falls_back_to_the_other_team_loadout(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, orange=4284)
+    assert _player(_stats(fake_raw), "Alice").car == "Fennec"
+
+
+def test_build_match_files_car_unknown_body_gives_generic_label(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, blue=999999, orange=999999)
+    assert _player(_stats(fake_raw), "Alice").car == "Modèle #999999"
+
+
+def test_build_match_files_car_without_loadout_is_none(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, blue=23, orange=23)
+    assert _player(_stats(fake_raw), "Bob").car is None
+
+
+@pytest.mark.parametrize("body", [0, -1, True, "23", None])
+def test_build_match_files_car_invalid_body_is_none(fake_raw, body):
+    set_loadout(fake_raw, 0, PRI_A, blue=body, orange=body)
+    assert _player(_stats(fake_raw), "Alice").car is None
+
+
+def test_build_match_files_car_kept_after_pri_deleted(fake_raw):
+    set_loadout(fake_raw, 0, PRI_A, blue=4284, orange=4284)
+    fake_raw["network_frames"]["frames"][30]["deleted_actors"].append(PRI_A)
+    assert _player(_stats(fake_raw), "Alice").car == "Fennec"
+
+
+def test_build_match_files_car_loadout_without_team_loadout_is_ignored(fake_raw):
+    add_update(fake_raw, 0, PRI_A, OBJ_LOADOUTS, {"Int": 3})
+    assert _player(_stats(fake_raw), "Alice").car is None
 
 
 def test_build_match_files_missing_player_stats_raises(fake_raw):
