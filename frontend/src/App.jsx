@@ -71,7 +71,7 @@ export default function App() {
       selectedPlayer={selectedPlayer}
       onSelectPlayer={setSelectedPlayer}
     >
-      <OverviewPage report={report} selectedPlayer={selectedPlayer} />
+      <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
     </Layout>
   );
 }

@@ -43,8 +43,10 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .team-orange { color: #ffa24d; }
 
 /* Header */
+html { scroll-padding-top: 90px; }
 .header {
-  position: relative;
+  position: sticky;
+  top: 0;
   z-index: 5;
   display: flex;
   flex-wrap: wrap;
@@ -53,6 +55,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
   padding: 16px 24px;
   background: var(--bar);
   border-bottom: 4px solid var(--blue);
+}
+@media (max-width: 640px) {
+  .header { position: static; }
 }
 .logo { display: flex; align-items: center; gap: 12px; }
 .logo-ball {
@@ -151,7 +156,11 @@ thead tr { background: var(--bar); color: var(--muted); font-size: 13px; text-tr
 th, td { padding: 12px 16px; text-align: right; }
 th:first-child, td:first-child { text-align: left; }
 thead th { font-weight: 500; }
-tbody tr { border-top: 1px solid var(--panel-edge); }
+tbody tr { border-top: 1px solid var(--panel-edge); cursor: pointer; }
+@media (hover: hover) {
+  tbody tr:hover { background: #1b2559; }
+}
+tbody tr:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 tbody tr.selected { background: var(--highlight); }
 tbody th { font-weight: 700; white-space: nowrap; }
 td.strong { font-weight: 700; }
