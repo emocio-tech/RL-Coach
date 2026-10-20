@@ -1,27 +1,42 @@
-# Upload d'un replay vers un JSON
+# Import d'un replay vers un dossier de JSON
 
 ## Résumé fonctionnel
-L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket` et en tire un JSON compact : infos du match, stats de chaque joueur, heatmap de position par joueur et trajectoires (joueurs et balle) échantillonnées à 5 Hz. Le JSON est stocké sous un identifiant unique ; le `.replay` d'origine n'est jamais conservé. Pour l'instant, le front affiche seulement l'identifiant du replay importé.
+L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket`, puis écrit dans `data/games/` un dossier propre au match. Son nom reprend le stade, le mode de jeu et l'id du replay. Ce dossier contient deux fichiers : `stats.json` (infos du match, stats de chaque joueur, démolitions, boost) et `map.json` (heatmap, trajectoires des joueurs et de la balle à 5 Hz). Le `.replay` d'origine n'est jamais conservé. La réponse contient le nom du dossier final, qui sert d'identifiant. Pour l'instant, le front affiche seulement cet identifiant.
 
-### Exemple
+### Exemple concret
 ```bash
 curl -X POST http://localhost:8000/api/replays -F "file=@match.replay"
 ```
-Réponse `201` :
+Réponse `201` (le replay est un 2v2 en ligne sur le stade `UF_Day_P`) :
 ```json
-{"id": "3f2a9c1e5b7d4a08b6c1d2e3f4a5b6c7"}
+{"id": "UF_Day_P_Online-2v2_900DE226..."}
 ```
-Le fichier `data/games/3f2a9c1e5b7d4a08b6c1d2e3f4a5b6c7.json` est créé (valeurs illustratives, tronquées) :
+Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient `stats.json` et `map.json`. Les valeurs ci-dessous sont illustratives et tronquées.
+
+`stats.json` :
 ```json
 {
-  "id": "3f2a9c1e...",
+  "replay_id": "900DE226...",
   "original_filename": "match.replay",
-  "match": {"match_type": "Online", "team_size": 3, "team0_score": 4,
-            "team1_score": 2, "duration_seconds": 312.0,
-            "map_name": "Stadium_P", "date": "2026-10-01 20-14-05"},
+  "match": {"match_type": "Online", "team_size": 2, "team0_score": 3,
+            "team1_score": 1, "duration_seconds": 312.0,
+            "map_name": "UF_Day_P", "date": "2026-10-01 20-14-05"},
   "players": [{
-    "stats": {"name": "Pseudo", "team": 0, "score": 512, "goals": 2,
-              "assists": 1, "saves": 3, "shots": 5},
+    "name": "Pseudo", "team": 0, "score": 512, "goals": 2,
+    "assists": 1, "saves": 3, "shots": 5,
+    "demolitions": {"inflicted": 4, "received": 2},
+    "boost": {"small_pads": 38, "big_pads": 6,
+              "consumed_per_minute": 312.4, "average_level": 41.7}
+  }]
+}
+```
+
+`map.json` :
+```json
+{
+  "replay_id": "900DE226...",
+  "players": [{
+    "name": "Pseudo", "team": 0,
     "heatmap": {"x_min": -4096.0, "x_max": 4096.0, "y_min": -5120.0,
                 "y_max": 5120.0, "counts": [[0, 0, 3, "… 26 colonnes"], "… 20 lignes"]},
     "track": {"t": [0.0, 0.2, 0.4], "x": [0.0, 35.2, null],
@@ -32,6 +47,7 @@ Le fichier `data/games/3f2a9c1e5b7d4a08b6c1d2e3f4a5b6c7.json` est créé (valeur
            "y": [0.0, 0.0, 80.1], "z": [92.8, 92.8, 95.0]}
 }
 ```
+Si l'on réimporte le même replay, un nouveau dossier `UF_Day_P_Online-2v2_900DE226..._2` est créé.
 
 ## Description technique
 
@@ -40,24 +56,69 @@ Le fichier `data/games/3f2a9c1e5b7d4a08b6c1d2e3f4a5b6c7.json` est créé (valeur
 
 | Nom | Type | Obligatoire | Contraintes |
 |---|---|---|---|
-| `file` | fichier | oui | Nom finissant par `.replay` (insensible à la casse), non vide, 50 Mo maximum (`MAX_UPLOAD_BYTES`). |
+| `file` | fichier | oui | Nom finissant par `.replay` (insensible à la casse), non vide, 50 Mo maximum (`MAX_UPLOAD_BYTES`, `backend/app/config.py`). |
 
 ### Sorties
-- Réponse `201` : `{"id": "<uuid4 hex>"}` (`UploadResult`).
-- Fichier `data/games/<uuid>.json` (`GAMES_DIR`), écrit via un `.tmp` puis `os.replace` ; le `.tmp` est supprimé en cas d'échec. Le dossier est créé à la volée.
-- Le `.replay` est copié dans un fichier temporaire de l'OS pour `rrrocket` (`rrrocket -n <fichier>`, timeout 60 s), supprimé dans un `finally`. Il n'est jamais écrit dans `data/`.
+- Réponse `201` : `{"id": "<nom du dossier final>"}` (`UploadResult`). Le nom peut porter un suffixe `_N` en cas de collision (voir ci-dessous).
+- Dossier `data/games/<nom>/` (`GAMES_DIR`) contenant `stats.json` (`STATS_FILENAME`) et `map.json` (`MAP_FILENAME`). Le dossier `games` est créé à la volée.
+- Écriture atomique : les deux fichiers sont d'abord écrits dans un dossier temporaire `data/games/.tmp-<uuid>`, puis ce dossier est renommé en nom final. En cas d'échec, le dossier temporaire est supprimé.
+- Le `.replay` est copié dans un fichier temporaire de l'OS pour `rrrocket` (`rrrocket -n <fichier>`, timeout 60 s), supprimé ensuite. Il n'est jamais écrit dans `data/`.
 
-### Format du JSON (`ReplayData`)
-- `id`, `original_filename` : nom nettoyé (basename, caractères de contrôle retirés, 255 caractères maximum).
-- `match` : `match_type`, `team_size`, `team0_score`, `team1_score`, `duration_seconds`, `map_name`, `date` (tous peuvent être `null`).
-- `players[]` : un élément par entrée de `PlayerStats` du replay.
-  - `stats` : `name`, `team`, `score`, `goals`, `assists` (= passes), `saves`, `shots` (0 si absent).
-  - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon (0,2 s).
+#### Nom du dossier
+Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`).
+- **MapName**, **MatchType** et **Id** viennent des propriétés du replay (`MapName`, `MatchType`, `Id`).
+- **Nettoyage** (`_sanitize`) :
+  - Tout caractère hors `A-Za-z0-9._-` devient `_`.
+  - Les `.` en début et fin de partie sont retirés.
+  - Chaque partie est limitée à 64 caractères.
+- **Valeurs de repli** :
+  - `UnknownMap` si `MapName` est absent ou vide.
+  - `Unknown` si `MatchType` est absent ou vide.
+  - `replay` si l'Id nettoyé est vide.
+- **Taille d'équipe** : la partie `-<N>v<N>` n'existe que si `TeamSize` est un entier. Elle est omise sinon.
+- **Id absent** : un `uuid4().hex` est généré. Le même id est écrit dans le champ `replay_id` des deux fichiers. Cet id n'est pas nettoyé, contrairement à la partie du nom de dossier.
+- **Collision** : si le dossier existe déjà, le suffixe `_2`, `_3`… est ajouté, jusqu'à 1000 tentatives. Le renommage sert de test de disponibilité. Si le nom reste occupé après 1000 tentatives, une `OSError` est levée. Un chemin sortant de `GAMES_DIR` provoque aussi une `OSError`.
+- **Réimport** : il n'y a pas de déduplication. Un même replay envoyé deux fois donne deux dossiers (`..._<Id>` puis `..._<Id>_2`).
+
+### Contenu de `stats.json` (`StatsFile`)
+- `replay_id` et `original_filename`. Ce dernier est nettoyé : basename, caractères de contrôle retirés, 255 caractères maximum.
+- `match` : `match_type`, `team_size`, `team0_score`, `team1_score`, `duration_seconds`, `map_name`, `date`. Chaque champ peut être `null`.
+- `players[]` : un élément par entrée `PlayerStats` du replay.
+  - Stats de base : `name`, `team`, `score`, `goals`, `assists` (= passes), `saves`, `shots` (0 si absent).
+  - `demolitions` : `inflicted`, `received`.
+  - `boost` : `small_pads`, `big_pads`, `consumed_per_minute`, `average_level`.
+
+#### Définitions
+- **Démolitions reçues** (`received`) :
+  - Elles viennent des événements de démolition réseau (`ReplicatedDemolishExtended` / `ReplicatedDemolish`).
+  - Les auto-démolitions sont ignorées.
+  - Les événements d'un même couple attaquant/victime espacés de moins de 3 s sont dédoublonnés (`DEMOLISH_DEDUP_WINDOW`, `backend/app/services/stats.py`).
+- **Démolitions infligées** (`inflicted`) :
+  - Elles viennent en priorité du compteur `TAGame.PRI_TA:MatchDemolishes` du joueur.
+  - Sans ce compteur, on utilise le nombre d'événements dédoublonnés où il est attaquant.
+- **Petits et gros pads** :
+  - Chaque ramassage de pad est rattaché à la voiture qui l'a pris. Il est classé selon le temps de réapparition du pad : délai entre le ramassage et l'événement « pad de nouveau disponible » (`BIG_PAD_MIN_RESPAWN`).
+  - Gros pad : délai ≥ 7,0 s (un petit pad réapparaît en 4 s, un gros en environ 10 s).
+  - Tout autre cas compte comme petit pad : délai inférieur, pad ramassé de nouveau avant l'événement de réapparition, ou ramassage encore en attente à la fin du replay.
+- **Boost consommé par minute** (`consumed_per_minute`) :
+  - C'est la somme des baisses de niveau de boost (en % du réservoir), divisée par `duration_seconds / 60`.
+  - Le résultat est `null` si la durée est absente ou nulle.
+- **Niveau moyen** (`average_level`) :
+  - C'est le niveau de boost, en % du réservoir (0 à 100), pondéré par le temps (`delta` des frames) sur les périodes où il est connu.
+  - Il est arrondi à 0,1 et vaut `null` si aucune période n'est connue.
+
+### Contenu de `map.json` (`MapFile`)
+- `replay_id`.
+- `players[]` : `name`, `team`, `heatmap`, `track`.
+  - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon de 0,2 s. Les positions hors bornes sont ramenées dans la cellule de bord.
   - `track` : tableaux colonnaires de même longueur `t`, `x`, `y`, `z`, `speed`, `boost`.
 - `ball` : `t`, `x`, `y`, `z`, avec les mêmes `t` que les joueurs.
-
-**Échantillonnage** : `FRAME_SAMPLE_HZ = 5` (pas de 0,2 s), `t` en secondes depuis la première frame. Une valeur est `null` quand la voiture ou la balle n'a pas de position connue.
-**Unités** : positions en unités du jeu (arrondies à 0,1) ; `speed` = norme de la vitesse linéaire (unités du jeu par seconde) ; `boost` entier de 0 à 100.
+- **Échantillonnage** : `FRAME_SAMPLE_HZ = 5` (pas de 0,2 s). `t` est en secondes depuis la première frame. Une valeur vaut `null` quand la voiture ou la balle n'a pas de position connue.
+- **Unités** :
+  - Les positions sont en unités du jeu, arrondies à 0,1.
+  - `speed` est la norme de la vitesse linéaire, en unités du jeu par seconde.
+  - `boost` est un entier de 0 à 100.
+- Les positions des joueurs ne figurent que dans `map.json`.
 
 ### Erreurs
 | Condition | Résultat |
@@ -67,13 +128,27 @@ Le fichier `data/games/3f2a9c1e5b7d4a08b6c1d2e3f4a5b6c7.json` est créé (valeur
 | Fichier vide | `400` |
 | `rrrocket` en erreur, timeout ou JSON invalide | `400` |
 | Pas de `PlayerStats` ou pas de frames réseau | `400` |
+| Champ `file` absent | `422` (validation FastAPI) |
 | Binaire `rrrocket` introuvable | `500` |
+| Échec d'écriture ou plus de 1000 collisions de nom (`OSError`) | non interceptée par la route, donc `500` |
+
+Dans tous les cas d'erreur, aucun dossier définitif n'est laissé : le dossier temporaire est supprimé.
 
 ### Configuration
-`RRROCKET_PATH` (variable d'environnement) surcharge `backend/bin/rrrocket.exe`. Installation : voir `README.md`.
+`RRROCKET_PATH` (variable d'environnement) surcharge `backend/bin/rrrocket.exe`. Installation : voir `README.md`. Les autres constantes sont dans `backend/app/config.py` : `GAMES_DIR`, `STATS_FILENAME`, `MAP_FILENAME`, `FRAME_SAMPLE_HZ`, `RRROCKET_TIMEOUT_SECONDS`.
 
 ### Périmètre et limites
-- Pas de route de lecture ni de liste : le front n'affiche que l'id importé.
-- Les joueurs sont associés à leurs trajectoires par leur nom : deux joueurs homonymes entrent en collision.
-- Pas de déduplication : un même replay envoyé deux fois donne deux ids.
-- Le fichier est lu en mémoire (par blocs de 1 Mo) et le parsing s'exécute dans un thread.
+- **Inclus** :
+  - Import d'un `.replay` vers un dossier `stats.json` + `map.json`.
+  - Nommage du dossier avec gestion des collisions.
+  - Stats de base, démolitions, boost, heatmap, trajectoires et balle.
+- **Exclu** :
+  - Aucune route de lecture ni de liste : le front affiche seulement l'id importé.
+  - Aucune migration des anciens fichiers `data/games/<uuid>.json`. Ils restent tels quels et ne sont pas lus.
+  - Aucune déduplication des réimports.
+- **Limites** :
+  - La classification petit/gros pad est une heuristique fondée sur le temps de réapparition, pas sur le type réel de pad. Un événement de réapparition manqué ou un pad supprimé en cours d'attente fait compter le ramassage comme petit ou l'ignore.
+  - Les démolitions sont dédoublonnées sur 3 s. Deux vraies démolitions du même attaquant sur la même victime en moins de 3 s sont comptées une seule fois dans `received`. `inflicted` vient en priorité du compteur `MatchDemolishes`.
+  - Les joueurs sont associés à leurs voitures, boosts et démolitions par leur nom. Deux joueurs homonymes entrent en collision : ce cas n'est pas géré.
+  - Le fichier est lu en mémoire (par blocs de 1 Mo) et le parsing s'exécute dans un thread.
+- **Dépendances** : binaire `rrrocket`, FastAPI/Starlette (`run_in_threadpool`), Pydantic. Services `parser`, `stats` et `storage` (`backend/app/services/`).

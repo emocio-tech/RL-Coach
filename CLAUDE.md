@@ -31,7 +31,7 @@ RL-Coach/
 
 ## Flux
 1. Le front envoie un `.replay` (multipart) à `POST /api/replays`.
-2. Le back extrait les données via rrrocket, puis sauvegarde uniquement le json dans `data/games/` (nom UUID) ; le `.replay` n'est jamais conservé.
+2. Le back extrait les données via rrrocket, puis sauvegarde uniquement `stats.json` et `map.json` dans un dossier de `data/games/` (nom `<stade>_<mode>_<id replay>`, suffixe `_N` en cas de collision) ; le `.replay` n'est jamais conservé.
 
 ## Commandes
 - Back : `cd backend; python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt; uvicorn app.main:app --reload` (port 8000)
