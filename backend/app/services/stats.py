@@ -54,8 +54,11 @@ class _State:
         self.consumed = {}
         self.small_pads = {}
         self.big_pads = {}
+        self.pad_identity = {}
         self.pad_last = {}
-        self.pending_pickups = {}
+        self.pad_pending = {}
+        self.pad_delays = {}
+        self.pad_pickups = []
         self.demolitions = []
         self.demolish_last = {}
         self.pri_counter = {}
@@ -69,6 +72,8 @@ class _State:
             self.ball = actor_id
         elif name == BOOST:
             self.boosts.add(actor_id)
+        if isinstance(name, str) and "VehiclePickup_Boost" in name:
+            self.pad_identity[actor_id] = name
 
     def _snapshot_counter(self, actor_id):
         name = self.pri_name.get(actor_id)
@@ -78,7 +83,7 @@ class _State:
     def _forget(self, actor_id):
         self._snapshot_counter(actor_id)
         self.pri_counter.pop(actor_id, None)
-        self.pad_last.pop(actor_id, None)
+        self.pad_identity.pop(actor_id, None)
         self.cars.discard(actor_id)
         if self.ball == actor_id:
             self.ball = None
@@ -126,7 +131,11 @@ class _State:
             body = attribute["RigidBody"] or {}
             location = body.get("location")
             if location:
-                self.rigid[actor_id] = (location, body.get("linear_velocity"))
+                self.rigid[actor_id] = (
+                    location,
+                    body.get("linear_velocity"),
+                    body.get("rotation"),
+                )
 
     def car_boost(self, car_id):
         for comp_id, owner in self.boost_car.items():
@@ -155,14 +164,15 @@ class _State:
             )
             self.level_time[player] = self.level_time.get(player, 0.0) + delta
 
-    def _count_pad(self, player, big):
-        target = self.big_pads if big else self.small_pads
-        target[player] = target.get(player, 0) + 1
-
-    def flush_pickups(self):
-        for player, _started in self.pending_pickups.values():
-            self._count_pad(player, False)
-        self.pending_pickups.clear()
+    def finalize_pads(self):
+        big_by_pad = {}
+        for pad, delays in self.pad_delays.items():
+            long_count = len([d for d in delays if d >= BIG_PAD_MIN_RESPAWN])
+            short_count = len([d for d in delays if d < BIG_PAD_MIN_RESPAWN])
+            big_by_pad[pad] = long_count > short_count
+        for pad, player in self.pad_pickups:
+            target = self.big_pads if big_by_pad.get(pad, False) else self.small_pads
+            target[player] = target.get(player, 0) + 1
 
     def _on_boost_amount(self, comp_id, value):
         car_id = self.boost_car.get(comp_id)
@@ -179,17 +189,18 @@ class _State:
                         self.consumed.get(player, 0.0) + previous_level - new_level
                     )
 
-    def _on_pickup(self, pad_id, attribute):
+    def _on_pickup(self, actor_id, attribute):
         data = attribute.get("PickupNew")
         if not isinstance(data, dict):
             return
+        pad = self.pad_identity.get(actor_id, actor_id)
         instigator = data.get("instigator")
         picked_up = data.get("picked_up")
         if picked_up == PICKUP_UNAVAILABLE:
-            pending = self.pending_pickups.pop(pad_id, None)
-            if pending is not None:
-                player, started = pending
-                self._count_pad(player, self.now - started >= BIG_PAD_MIN_RESPAWN)
+            self.pad_last.pop(pad, None)
+            if pad in self.pad_pending:
+                started = self.pad_pending.pop(pad)
+                self.pad_delays.setdefault(pad, []).append(self.now - started)
             return
         if (
             not isinstance(instigator, int)
@@ -198,16 +209,15 @@ class _State:
         ):
             return
         key = (picked_up, instigator)
-        if self.pad_last.get(pad_id) == key:
+        if key == self.pad_last.get(pad):
             return
-        self.pad_last[pad_id] = key
+        self.pad_last[pad] = key
         player = self.car_player(instigator)
         if player is None:
             return
-        previous = self.pending_pickups.pop(pad_id, None)
-        if previous is not None:
-            self._count_pad(previous[0], False)
-        self.pending_pickups[pad_id] = (player, self.now)
+        self.pad_pickups.append((pad, player))
+        if pad not in self.pad_pending:
+            self.pad_pending[pad] = self.now
 
     def _on_demolish(self, attribute):
         data = None
@@ -240,7 +250,15 @@ class _State:
             rigid = self.rigid.get(car_id)
             if rigid is None:
                 continue
-            location, velocity = rigid
+            location, velocity, rotation = rigid
+            quaternion = None
+            if isinstance(rotation, dict):
+                parts = [rotation.get(k) for k in ("x", "y", "z", "w")]
+                if all(
+                    isinstance(v, (int, float)) and not isinstance(v, bool)
+                    for v in parts
+                ):
+                    quaternion = tuple(round(v, 4) for v in parts)
             speed = None
             if velocity:
                 speed = round(
@@ -257,6 +275,7 @@ class _State:
                 round(location["z"], 1),
                 speed,
                 self.car_boost(car_id),
+                quaternion,
             )
         return None
 
@@ -367,7 +386,7 @@ def build_match_files(
     while frame_index < len(frames):
         process_frame(frames[frame_index])
         frame_index += 1
-    state.flush_pickups()
+    state.finalize_pads()
     for pri_id in list(state.pri_counter):
         state._snapshot_counter(pri_id)
 
@@ -426,6 +445,10 @@ def build_match_files(
                     z=[r[2] if r else None for r in rows],
                     speed=[r[3] if r else None for r in rows],
                     boost=[r[4] if r else None for r in rows],
+                    qx=[r[5][0] if r and r[5] else None for r in rows],
+                    qy=[r[5][1] if r and r[5] else None for r in rows],
+                    qz=[r[5][2] if r and r[5] else None for r in rows],
+                    qw=[r[5][3] if r and r[5] else None for r in rows],
                 ),
             )
         )

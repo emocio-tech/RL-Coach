@@ -1,7 +1,7 @@
 # Import d'un replay vers un dossier de JSON
 
 ## Résumé fonctionnel
-L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket`, puis écrit dans `data/games/` un dossier propre au match. Son nom reprend le stade, le mode de jeu et l'id du replay. Ce dossier contient deux fichiers : `stats.json` (infos du match, stats de chaque joueur, démolitions, boost) et `map.json` (heatmap, trajectoires des joueurs et de la balle à 5 Hz). Le `.replay` d'origine n'est jamais conservé. La réponse contient le nom du dossier final, qui sert d'identifiant. Pour l'instant, le front affiche seulement cet identifiant.
+L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket`, puis écrit dans `data/games/` un dossier propre au match. Son nom reprend le stade, le mode de jeu et l'id du replay. Ce dossier contient deux fichiers : `stats.json` (infos du match, stats de chaque joueur, démolitions, boost) et `map.json` (heatmap, trajectoires des joueurs et de la balle à 5 Hz). Pour chaque joueur, la trajectoire contient la position, la vitesse, le boost et l'orientation de la voiture (quaternion). Le `.replay` d'origine n'est jamais conservé. La réponse contient le nom du dossier final, qui sert d'identifiant. Pour l'instant, le front affiche seulement cet identifiant.
 
 ### Exemple concret
 ```bash
@@ -41,7 +41,9 @@ Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient 
                 "y_max": 5120.0, "counts": [[0, 0, 3, "… 26 colonnes"], "… 20 lignes"]},
     "track": {"t": [0.0, 0.2, 0.4], "x": [0.0, 35.2, null],
               "y": [-4608.0, -4510.3, null], "z": [17.0, 17.0, null],
-              "speed": [0.0, 412.5, null], "boost": [33, 33, null]}
+              "speed": [0.0, 412.5, null], "boost": [33, 33, null],
+              "qx": [0.0, -0.0034, null], "qy": [0.0, 0.0021, null],
+              "qz": [0.7071, 0.7068, null], "qw": [0.7071, 0.7074, null]}
   }],
   "ball": {"t": [0.0, 0.2, 0.4], "x": [0.0, 0.0, 12.4],
            "y": [0.0, 0.0, 80.1], "z": [92.8, 92.8, 95.0]}
@@ -96,10 +98,13 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 - **Démolitions infligées** (`inflicted`) :
   - Elles viennent en priorité du compteur `TAGame.PRI_TA:MatchDemolishes` du joueur.
   - Sans ce compteur, on utilise le nombre d'événements dédoublonnés où il est attaquant.
-- **Petits et gros pads** :
-  - Chaque ramassage de pad est rattaché à la voiture qui l'a pris. Il est classé selon le temps de réapparition du pad : délai entre le ramassage et l'événement « pad de nouveau disponible » (`BIG_PAD_MIN_RESPAWN`).
-  - Gros pad : délai ≥ 7,0 s (un petit pad réapparaît en 4 s, un gros en environ 10 s).
-  - Tout autre cas compte comme petit pad : délai inférieur, pad ramassé de nouveau avant l'événement de réapparition, ou ramassage encore en attente à la fin du replay.
+- **Petits et gros pads** (`_State._on_pickup` et `_State.finalize_pads`, `backend/app/services/stats.py`) :
+  - **Identité du pad** : chaque pad est identifié par le nom d'objet du pad (objet contenant `VehiclePickup_Boost`). Cette identité est conservée même si le replay recrée l'acteur. Sans nom de pad, l'identité retombe sur l'identifiant d'acteur.
+  - **Dédoublonnage des ramassages** : le replay est un flux avec des keyframes environ toutes les 10 s, qui ré-annoncent l'état courant des acteurs. Un même ramassage ré-émis n'est donc compté qu'une fois. Le dédoublonnage se fait par pad sur le couple (`picked_up`, `instigator`). Il est réinitialisé quand le pad redevient disponible (événement `picked_up = 255`, `PICKUP_UNAVAILABLE`).
+  - **Rattachement** : chaque ramassage est attribué au joueur propriétaire de la voiture qui l'a pris (`instigator`). Un ramassage dont la voiture n'est pas rattachée à un joueur est ignoré.
+  - **Délai de réapparition** : délai entre le premier ramassage et l'événement « pad de nouveau disponible ». Il est enregistré par pad.
+  - **Classification par pad, à la fin du replay** : un pad est gros si ses délais ≥ 7,0 s (`BIG_PAD_MIN_RESPAWN`) sont plus nombreux que ses délais < 7,0 s. Un petit pad réapparaît en 4 s, un gros en environ 10 s. Sinon il est petit : cela inclut un pad sans délai observé ou une égalité. Tous les ramassages du pad prennent cette classe.
+  - **Ordres de grandeur** mesurés sur des replays réels : un 2v2 de 227 s donne 301 ramassages, dont 68 sur les 6 gros pads. Un match à 6 joueurs en donne 579, dont 127.
 - **Boost consommé par minute** (`consumed_per_minute`) :
   - C'est la somme des baisses de niveau de boost (en % du réservoir), divisée par `duration_seconds / 60`.
   - Le résultat est `null` si la durée est absente ou nulle.
@@ -111,14 +116,19 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 - `replay_id`.
 - `players[]` : `name`, `team`, `heatmap`, `track`.
   - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon de 0,2 s. Les positions hors bornes sont ramenées dans la cellule de bord.
-  - `track` : tableaux colonnaires de même longueur `t`, `x`, `y`, `z`, `speed`, `boost`.
+  - `track` : tableaux colonnaires de même longueur `t`, `x`, `y`, `z`, `speed`, `boost`, `qx`, `qy`, `qz`, `qw` (`PlayerTrack`, `backend/app/schemas/replay.py`).
+    - `qx`, `qy`, `qz`, `qw` donnent l'orientation de la voiture : un quaternion unitaire dans le repère du jeu, avec la composante `w` en dernier.
+    - Ces valeurs sont `null` quand la voiture est inconnue ou n'a pas de rotation.
+    - Elles sont renseignées même quand la voiture est immobile ou endormie, alors que `speed` peut être `null`.
 - `ball` : `t`, `x`, `y`, `z`, avec les mêmes `t` que les joueurs.
 - **Échantillonnage** : `FRAME_SAMPLE_HZ = 5` (pas de 0,2 s). `t` est en secondes depuis la première frame. Une valeur vaut `null` quand la voiture ou la balle n'a pas de position connue.
 - **Unités** :
   - Les positions sont en unités du jeu, arrondies à 0,1.
   - `speed` est la norme de la vitesse linéaire, en unités du jeu par seconde.
   - `boost` est un entier de 0 à 100.
-- Les positions des joueurs ne figurent que dans `map.json`.
+  - `qx`, `qy`, `qz`, `qw` sont des composantes de quaternion sans unité, arrondies à 4 décimales.
+- **Taille indicative** : environ 0,4 Mo pour un 2v2 de 4 min (mesuré à 0,43 Mo sur un replay de 227 s).
+- Les positions et orientations des joueurs ne figurent que dans `map.json`.
 
 ### Erreurs
 | Condition | Résultat |
@@ -141,13 +151,15 @@ Dans tous les cas d'erreur, aucun dossier définitif n'est laissé : le dossier 
 - **Inclus** :
   - Import d'un `.replay` vers un dossier `stats.json` + `map.json`.
   - Nommage du dossier avec gestion des collisions.
-  - Stats de base, démolitions, boost, heatmap, trajectoires et balle.
+  - Stats de base, démolitions, boost, heatmap, trajectoires (position, vitesse, boost, orientation) et balle.
 - **Exclu** :
   - Aucune route de lecture ni de liste : le front affiche seulement l'id importé.
   - Aucune migration des anciens fichiers `data/games/<uuid>.json`. Ils restent tels quels et ne sont pas lus.
   - Aucune déduplication des réimports.
+  - Pas d'orientation pour la balle.
 - **Limites** :
-  - La classification petit/gros pad est une heuristique fondée sur le temps de réapparition, pas sur le type réel de pad. Un événement de réapparition manqué ou un pad supprimé en cours d'attente fait compter le ramassage comme petit ou l'ignore.
+  - La classification petit/gros pad est une heuristique statistique par pad, fondée sur les temps de réapparition, pas sur le type réel de pad. Un pad jamais revu à l'état disponible (aucun délai observé) est classé petit.
+  - La map est supposée avoir des pads identifiables par leur nom d'objet. Sans nom de pad, l'identité retombe sur l'identifiant d'acteur, ce qui est moins stable si le replay recrée l'acteur.
   - Les démolitions sont dédoublonnées sur 3 s. Deux vraies démolitions du même attaquant sur la même victime en moins de 3 s sont comptées une seule fois dans `received`. `inflicted` vient en priorité du compteur `MatchDemolishes`.
   - Les joueurs sont associés à leurs voitures, boosts et démolitions par leur nom. Deux joueurs homonymes entrent en collision : ce cas n'est pas géré.
   - Le fichier est lu en mémoire (par blocs de 1 Mo) et le parsing s'exécute dans un thread.

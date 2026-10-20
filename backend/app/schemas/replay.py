@@ -32,6 +32,10 @@ class PlayerTrack(BaseModel):
     z: list[float | None]
     speed: list[float | None]
     boost: list[int | None]
+    qx: list[float | None]
+    qy: list[float | None]
+    qz: list[float | None]
+    qw: list[float | None]
 
 
 class Heatmap(BaseModel):
