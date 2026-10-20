@@ -27,6 +27,7 @@ class MatchStats(BaseModel):
 class PlayerStats(BaseModel):
     name: str
     team: int
+    car: str | None = None
     score: int = 0
     goals: int = 0
     assists: int = 0

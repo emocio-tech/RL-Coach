@@ -21,6 +21,7 @@ PRI_A, PRI_B = 20, 21
 BOOST_A, BOOST_B = 30, 31
 PAD_SMALL, PAD_BIG, PAD_BIG2 = 40, 41, 42
 PAD_FIRST_ID, PAD_COUNT = 40, 8  # actor ids 40..47 each get a pad object name
+OBJ_LOADOUTS = OBJ_PAD_FIRST + PAD_COUNT  # last object of the fake objects list
 PAD_SPARE = 43  # actor id free for tests that recreate a pad under another actor_id
 REPLAY_ID = "ABC123DEF"
 FOLDER_NAME = f"Stadium_P_Online-1v1_{REPLAY_ID}"
@@ -88,7 +89,7 @@ def fake_raw():
     ] + [
         f"TAGame.Default__PersistentLevel.VehiclePickup_Boost_TA_{n}"
         for n in range(PAD_COUNT)
-    ]
+    ] + ["TAGame.PRI_TA:ClientLoadouts"]
     frames = []
     for i in range(N_FRAMES):
         frame = {
@@ -166,6 +167,16 @@ def pickup(raw, frame, pad_id, instigator, picked_up=1):
 def release(raw, frame, pad_id):
     """Pad becomes available again (picked_up == 255): resolves a pending pickup."""
     pickup(raw, frame, pad_id, None, picked_up=255)
+
+
+def set_loadout(raw, frame, pri_actor, blue=None, orange=None):
+    """ClientLoadouts update of a PRI; a side left at None has no loadout entry."""
+    team_loadout = {
+        key: {"version": 28, "body": body, "decal": 0}
+        for key, body in (("blue", blue), ("orange", orange))
+        if body is not None
+    }
+    add_update(raw, frame, pri_actor, OBJ_LOADOUTS, {"TeamLoadout": team_loadout})
 
 
 def add_frame(raw, rel_time):
