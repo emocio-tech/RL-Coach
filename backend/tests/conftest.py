@@ -238,3 +238,4 @@ def fake_raw_with_events(fake_raw):
     add_update(raw, 40, PRI_A, OBJ_MATCH_DEMOLISHES, {"Int": 1})
     add_update(raw, 40, PRI_B, OBJ_MATCH_DEMOLISHES, {"Int": 0})
     return raw
+

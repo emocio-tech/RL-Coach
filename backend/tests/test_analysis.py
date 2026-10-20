@@ -217,3 +217,38 @@ def test_get_stats_endpoint_without_map_file(client, files, games_dir):
 @pytest.mark.parametrize("game_id", ["unknown", "..", "a%2Fb", ".hidden"])
 def test_get_stats_unknown_id_returns_404(client, game_id):
     assert client.get(f"/api/replays/{game_id}/stats").status_code == 404
+
+
+def test_build_report_exposes_timeline_seconds_from_map_file(fake_raw):
+    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+
+    report = analysis.build_report(GAME_ID, stats_file, map_file)
+
+    assert report.timeline_seconds == 2.0
+
+
+def test_build_report_without_map_file_has_no_timeline(files):
+    report = analysis.build_report(GAME_ID, files[0], None)
+
+    assert report.timeline_seconds is None
+
+
+def test_get_stats_endpoint_exposes_timeline_seconds(client, fake_raw, games_dir):
+    _write_game(games_dir, stats.build_match_files("abc", "game.replay", fake_raw))
+
+    assert client.get(f"/api/replays/{GAME_ID}/stats").json()["timeline_seconds"] == 2.0
+
+
+def test_get_stats_endpoint_legacy_map_json_without_timeline_seconds(client, files, games_dir):
+    import json
+
+    _write_game(games_dir, files)
+    map_path = games_dir / GAME_ID / config.MAP_FILENAME
+    legacy = json.loads(map_path.read_text(encoding="utf-8"))
+    del legacy["timeline_seconds"]
+    map_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+    response = client.get(f"/api/replays/{GAME_ID}/stats")
+
+    assert response.status_code == 200
+    assert response.json()["timeline_seconds"] is None
