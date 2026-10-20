@@ -62,7 +62,7 @@ def test_upload_replay_nominal_returns_201_and_writes_stats_and_map(client, game
 def test_upload_replay_nominal_stats_json_has_no_tracking_data(client, games_dir, mock_parse):
     replay_id = _post(client).json()["id"]
     text = (games_dir / replay_id / "stats.json").read_text(encoding="utf-8")
-    for key in ("track", "heatmap", "ball"):
+    for key in ("track", "heatmap", "ball", "qx", "qy", "qz", "qw"):
         assert f'"{key}"' not in text
     player = json.loads(text)["players"][0]
     assert {"demolitions", "boost"} <= set(player)
@@ -74,6 +74,14 @@ def test_upload_replay_nominal_events_reach_stats_json(client, games_dir, monkey
     bob = next(p for p in _stats_of(games_dir, replay_id)["players"] if p["name"] == "Bob")
     assert bob["demolitions"] == {"inflicted": 0, "received": 1}
     assert (bob["boost"]["small_pads"], bob["boost"]["big_pads"]) == (1, 2)
+
+
+def test_upload_replay_nominal_map_json_track_has_rotation_columns(client, games_dir, mock_parse):
+    replay_id = _post(client).json()["id"]
+    track = _read(games_dir, replay_id, config.MAP_FILENAME)["players"][0]["track"]
+    n = len(track["t"])
+    assert all(len(track[k]) == n for k in ("qx", "qy", "qz", "qw"))
+    assert track["qw"][0] == 0.9274
 
 
 def test_upload_replay_nominal_keeps_no_replay_file(client, games_dir, mock_parse, tmp_path):
@@ -303,5 +311,5 @@ def test_upload_replay_real_replay_integration(client, games_dir):
     assert len(data["ball"]["x"]) == len(data["ball"]["y"]) == len(data["ball"]["z"]) == n
     for p in data["players"]:
         tr = p["track"]
-        assert all(len(tr[k]) == n for k in ("t", "x", "y", "z", "speed", "boost"))
+        assert all(len(tr[k]) == n for k in ("t", "x", "y", "z", "speed", "boost", "qx", "qy", "qz", "qw"))
         assert len(p["heatmap"]["counts"]) == 20
