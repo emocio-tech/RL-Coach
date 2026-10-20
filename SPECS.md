@@ -34,7 +34,7 @@ Il se compose de deux parties.
 - le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir.
 
 ### Fichier `map.json`
-Il décrit le déroulé du match dans le temps : position 3D, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
+Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
 
 ## Écran d'accueil
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
@@ -103,6 +103,7 @@ Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans jo
 | 2 | 2026-10-20 10:33 | Dimitri FORT | issue-6-replay-upload-json-transcription |
 | 3 | 2026-10-20 11:50 | Dimitri FORT | issue-15-improve-replay-export |
 | 4 | 2026-10-20 12:20 | iwao | issue-13-interface-design |
-| 5 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
+| 5 | 2026-10-20 14:35 | Dimitri FORT | issue-17-fix-boost-calculation |
+| 6 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
 
 </details>

@@ -5,9 +5,10 @@ import pytest
 from app.services import stats
 from app.services.parser import ReplayParseError
 from tests.conftest import (
-    BOOST_A, BOOST_B, CAR_A, CAR_B, PAD_SMALL, PRI_A, PRI_B,
-    OBJ_CAR, OBJ_MATCH_DEMOLISHES, OBJ_PAWN_PRI, OBJ_PRI_NAME, OBJ_REP_BOOST,
-    add_frame, add_update, demolish, pickup, release, set_boost,
+    BOOST_A, BOOST_B, CAR_A, CAR_B, PAD_SMALL, PAD_SPARE, PRI_A, PRI_B,
+    OBJ_CAR, OBJ_MATCH_DEMOLISHES, OBJ_PAWN_PRI, OBJ_PRI_NAME, OBJ_REP_BOOST, OBJ_RBSTATE,
+    ROT_B,
+    add_frame, add_update, announce_pad, demolish, pad_object_id, pickup, release, set_boost,
 )
 
 N_SAMPLES = 11  # 2.0 s at 5 Hz, inclusive
@@ -40,6 +41,13 @@ def test_build_match_files_match_fields(fake_raw):
     assert m.date == "2024-01-02 03-04-05"
 
 
+def test_build_match_files_missing_team_scores_default_to_zero(fake_raw):
+    del fake_raw["properties"]["Team0Score"]
+    del fake_raw["properties"]["Team1Score"]
+    m = _stats(fake_raw).match
+    assert (m.team0_score, m.team1_score) == (0, 0)
+
+
 def test_build_match_files_player_stats(fake_raw):
     data = _stats(fake_raw)
     assert [p.name for p in data.players] == ["Alice", "Bob"]
@@ -58,7 +66,11 @@ def test_build_match_files_arrays_have_same_length(fake_raw):
     data = _map(fake_raw)
     for p in data.players:
         tr = p.track
-        assert {len(tr.t), len(tr.x), len(tr.y), len(tr.z), len(tr.speed), len(tr.boost)} == {N_SAMPLES}
+        lengths = {
+            len(tr.t), len(tr.x), len(tr.y), len(tr.z), len(tr.speed), len(tr.boost),
+            len(tr.qx), len(tr.qy), len(tr.qz), len(tr.qw),
+        }
+        assert lengths == {N_SAMPLES}
     b = data.ball
     assert {len(b.t), len(b.x), len(b.y), len(b.z)} == {N_SAMPLES}
 
@@ -67,6 +79,79 @@ def test_build_match_files_speed_is_velocity_norm(fake_raw):
     alice = _player(_map(fake_raw), "Alice")
     assert alice.track.speed[0] == pytest.approx(math.hypot(300, 400))
     assert alice.track.speed[0] == 500.0
+
+
+_REMOVE = object()
+
+
+def _set_body(raw, car, **fields):
+    """Overwrite fields of the RigidBody of every update of a car (_REMOVE deletes the key)."""
+    for f in raw["network_frames"]["frames"]:
+        for u in f["updated_actors"]:
+            if u["actor_id"] == car and u["object_id"] == OBJ_RBSTATE:
+                for key, value in fields.items():
+                    if value is _REMOVE:
+                        u["attribute"]["RigidBody"].pop(key, None)
+                    else:
+                        u["attribute"]["RigidBody"][key] = value
+
+
+def test_build_match_files_rotation_columns_follow_car_quaternion(fake_raw):
+    tr = _player(_map(fake_raw), "Alice").track
+    assert (tr.qx[0], tr.qy[0], tr.qz[0], tr.qw[0]) == (0.1, 0.2, 0.3, 0.9274)
+    bob = _player(_map(fake_raw), "Bob").track
+    assert (bob.qx[3], bob.qy[3], bob.qz[3], bob.qw[3]) == (0.5, 0.5, 0.5, 0.5)
+    assert all(v is not None for v in tr.qx + tr.qy + tr.qz + tr.qw)
+
+
+def test_build_match_files_rotation_rounded_to_4_decimals(fake_raw):
+    _set_body(fake_raw, CAR_A, rotation={"x": 0.123449, "y": 0.123451, "z": -0.55555, "w": 0.7})
+    tr = _player(_map(fake_raw), "Alice").track
+    assert (tr.qx[0], tr.qy[0], tr.qw[0]) == (0.1234, 0.1235, 0.7)
+    assert tr.qz[0] == round(-0.55555, 4)
+
+
+def test_build_match_files_sleeping_car_has_no_speed_but_keeps_rotation(fake_raw):
+    _set_body(fake_raw, CAR_A, linear_velocity=None)
+    tr = _player(_map(fake_raw), "Alice").track
+    assert set(tr.speed) == {None}
+    assert tr.x[0] == -1000.0
+    assert (tr.qx[0], tr.qy[0], tr.qz[0], tr.qw[0]) == (0.1, 0.2, 0.3, 0.9274)
+
+
+def test_build_match_files_missing_rotation_gives_none(fake_raw):
+    _set_body(fake_raw, CAR_A, rotation=_REMOVE)
+    tr = _player(_map(fake_raw), "Alice").track
+    assert set(tr.qx) == set(tr.qy) == set(tr.qz) == set(tr.qw) == {None}
+    assert tr.x[0] == -1000.0  # position and speed are unaffected
+    assert tr.speed[0] == 500.0
+    assert _player(_map(fake_raw), "Bob").track.qw[0] == 0.5
+
+
+@pytest.mark.parametrize("missing", ["x", "y", "z", "w"])
+def test_build_match_files_incomplete_rotation_gives_none(fake_raw, missing):
+    rotation = {k: v for k, v in ROT_B.items() if k != missing}
+    _set_body(fake_raw, CAR_B, rotation=rotation)
+    tr = _player(_map(fake_raw), "Bob").track
+    assert set(tr.qx) == set(tr.qy) == set(tr.qz) == set(tr.qw) == {None}
+
+
+def test_build_match_files_non_numeric_rotation_component_gives_none(fake_raw):
+    _set_body(fake_raw, CAR_B, rotation={"x": 0.5, "y": "0.5", "z": 0.5, "w": True})
+    assert set(_player(_map(fake_raw), "Bob").track.qw) == {None}
+
+
+def test_build_match_files_player_without_car_has_no_rotation(fake_raw):
+    fake_raw["properties"]["PlayerStats"].append({"Name": "Ghost", "Team": 0})
+    tr = _player(_map(fake_raw), "Ghost").track
+    assert {*tr.qx, *tr.qy, *tr.qz, *tr.qw} == {None}
+
+
+def test_build_match_files_deleted_car_gives_no_rotation_afterwards(fake_raw):
+    fake_raw["network_frames"]["frames"][30]["deleted_actors"] = [CAR_B]
+    bob = _player(_map(fake_raw), "Bob").track
+    assert bob.qw[0] == 0.5
+    assert all(v is None for v in bob.qw[6:])
 
 
 def test_build_match_files_boost_converted_to_percent(fake_raw):
@@ -274,22 +359,30 @@ def test_build_match_files_pad_pickup_never_released_counted_small_at_end(fake_r
     assert (boost.small_pads, boost.big_pads) == (1, 0)
 
 
-def test_build_match_files_second_pickup_on_pending_pad_counts_first_small(fake_raw):
-    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
-    pickup(fake_raw, 30, PAD_SMALL, CAR_A)
-    release(fake_raw, add_frame(fake_raw, 11.0), PAD_SMALL)  # 10 s after Alice's pickup
+def test_build_match_files_second_valid_pickup_without_release_keeps_first_start(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, CAR_B)  # t = 0.33 s
+    pickup(fake_raw, 30, PAD_SMALL, CAR_A)  # t = 1.0 s, no 255 in between: must not replace the wait
+    # delay = 7.5 - 0.33 = 7.17 s from the first pickup (>= 7) but 6.5 s from the second (< 7)
+    release(fake_raw, add_frame(fake_raw, 7.5), PAD_SMALL)
     bob = _sp(fake_raw, "Bob").boost
     alice = _sp(fake_raw, "Alice").boost
-    assert (bob.small_pads, bob.big_pads) == (1, 0)
+    assert (bob.small_pads, bob.big_pads) == (0, 1)
     assert (alice.small_pads, alice.big_pads) == (0, 1)
 
 
-def test_build_match_files_pad_release_counted_once(fake_raw):
-    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
-    release(fake_raw, 20, PAD_SMALL)
-    release(fake_raw, 21, PAD_SMALL)
-    boost = _sp(fake_raw, "Bob").boost
-    assert (boost.small_pads, boost.big_pads) == (1, 0)
+def test_build_match_files_pad_duplicate_release_adds_no_delay():
+    state = stats._State()
+    state.add_actor(PAD_SMALL, "X.VehiclePickup_Boost_TA_0")
+    state.cars.add(CAR_B)
+    state.car_pri[CAR_B] = PRI_B
+    state.pri_name[PRI_B] = "Bob"
+    attribute = "TAGame.VehiclePickup_TA:NewReplicatedPickupData"
+    state.now = 1.0
+    state.update_actor(PAD_SMALL, attribute, {"PickupNew": {"instigator": CAR_B, "picked_up": 1}})
+    state.now = 3.0
+    for _ in range(2):
+        state.update_actor(PAD_SMALL, attribute, {"PickupNew": {"instigator": None, "picked_up": 255}})
+    assert state.pad_delays == {"X.VehiclePickup_Boost_TA_0": [2.0]}
 
 
 def test_build_match_files_pad_without_instigator_ignored(fake_raw):
@@ -312,6 +405,92 @@ def test_build_match_files_same_pickup_repeated_counted_once(fake_raw):
     for frame in (10, 11, 12):
         pickup(fake_raw, frame, PAD_SMALL, CAR_B)
     assert _sp(fake_raw, "Bob").boost.small_pads == 1
+
+
+def _cycles(raw, pad, cycles):
+    """cycles: (pickup time, car, release time or None), chronological, times in s after frame 0."""
+    for pick_time, car, release_time in cycles:
+        pickup(raw, add_frame(raw, pick_time), pad, car)
+        if release_time is not None:
+            release(raw, add_frame(raw, release_time), pad)
+
+
+def _pads(raw, name):
+    boost = _sp(raw, name).boost
+    return boost.small_pads, boost.big_pads
+
+
+def test_build_match_files_pad_keyframe_reannounce_counted_once(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
+    announce_pad(fake_raw, 15, PAD_SMALL, PAD_SMALL)  # keyframe: same actor announced again
+    pickup(fake_raw, 15, PAD_SMALL, CAR_B)  # same (picked_up, instigator) key re-emitted
+    assert _pads(fake_raw, "Bob") == (1, 0)
+
+
+def test_build_match_files_pad_same_key_valid_again_after_release(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
+    release(fake_raw, 20, PAD_SMALL)
+    pickup(fake_raw, 30, PAD_SMALL, CAR_B)
+    assert _pads(fake_raw, "Bob") == (2, 0)
+
+
+def test_build_match_files_pad_recreated_with_new_actor_id_keeps_identity(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
+    fake_raw["network_frames"]["frames"][15]["deleted_actors"].append(PAD_SMALL)
+    announce_pad(fake_raw, 20, PAD_SPARE, PAD_SMALL)  # same object name, other actor_id
+    pickup(fake_raw, 20, PAD_SPARE, CAR_B)  # same key: re-emission, not a new pickup
+    assert _pads(fake_raw, "Bob") == (1, 0)
+
+
+def test_build_match_files_pad_different_object_names_are_different_pads(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, CAR_B)
+    pickup(fake_raw, 10, PAD_SPARE, CAR_B)  # same key but another pad (other object name)
+    assert _pads(fake_raw, "Bob") == (2, 0)
+
+
+def test_build_match_files_pad_without_object_name_identified_by_actor_id(fake_raw):
+    # an actor never announced as a pad still works: identity = actor_id, same key counted once
+    for _ in range(2):
+        pickup(fake_raw, 10, 99, CAR_B)
+    assert _pads(fake_raw, "Bob") == (1, 0)
+
+
+def test_build_match_files_pad_majority_of_long_delays_counts_all_pickups_big(fake_raw):
+    _cycles(fake_raw, PAD_SMALL, [(3.0, CAR_B, 11.0), (12.0, CAR_A, 20.0), (21.0, CAR_B, 24.0)])
+    assert _pads(fake_raw, "Bob") == (0, 2)
+    assert _pads(fake_raw, "Alice") == (0, 1)
+
+
+def test_build_match_files_pad_single_long_delay_among_short_stays_small(fake_raw):
+    _cycles(fake_raw, PAD_SMALL, [
+        (3.0, CAR_B, 7.0), (8.0, CAR_B, 12.0), (13.0, CAR_B, 20.5), (21.0, CAR_B, 25.0),
+    ])
+    assert _pads(fake_raw, "Bob") == (4, 0)
+
+
+def test_build_match_files_pad_tie_between_long_and_short_delays_is_small(fake_raw):
+    _cycles(fake_raw, PAD_SMALL, [(3.0, CAR_B, 11.0), (12.0, CAR_B, 16.0)])
+    assert _pads(fake_raw, "Bob") == (2, 0)
+
+
+def test_build_match_files_pad_classification_is_per_pad(fake_raw):
+    _cycles(fake_raw, PAD_SMALL, [(3.0, CAR_B, 11.0)])
+    _cycles(fake_raw, PAD_SPARE, [(12.0, CAR_B, 14.0)])
+    assert _pads(fake_raw, "Bob") == (1, 1)
+
+
+def test_build_match_files_pad_pickup_with_unresolved_player_ignored(fake_raw):
+    pickup(fake_raw, 10, PAD_SMALL, 99)  # actor 99 is not a known car
+    release(fake_raw, 20, PAD_SMALL)
+    for name in ("Alice", "Bob"):
+        assert _pads(fake_raw, name) == (0, 0)
+
+
+def test_build_match_files_pad_non_integer_instigator_ignored(fake_raw):
+    for frame, instigator in ((5, True), (6, "11"), (7, 1.0)):
+        pickup(fake_raw, frame, PAD_SMALL, instigator)
+    for name in ("Alice", "Bob"):
+        assert _pads(fake_raw, name) == (0, 0)
 
 
 def test_build_match_files_consumed_per_minute(fake_raw_with_events):
@@ -365,7 +544,7 @@ def _all_keys(value):
 
 def test_build_match_files_stats_file_has_no_tracking_data(fake_raw_with_events):
     keys = set(_all_keys(_stats(fake_raw_with_events).model_dump()))
-    assert not keys & {"x", "y", "z", "t", "track", "heatmap", "ball", "speed"}
+    assert not keys & {"x", "y", "z", "t", "track", "heatmap", "ball", "speed", "qx", "qy", "qz", "qw"}
 
 
 def test_build_match_files_map_file_has_no_stats_data(fake_raw_with_events):
