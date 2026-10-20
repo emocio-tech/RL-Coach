@@ -41,6 +41,13 @@ def test_build_match_files_match_fields(fake_raw):
     assert m.date == "2024-01-02 03-04-05"
 
 
+def test_build_match_files_missing_team_scores_default_to_zero(fake_raw):
+    del fake_raw["properties"]["Team0Score"]
+    del fake_raw["properties"]["Team1Score"]
+    m = _stats(fake_raw).match
+    assert (m.team0_score, m.team1_score) == (0, 0)
+
+
 def test_build_match_files_player_stats(fake_raw):
     data = _stats(fake_raw)
     assert [p.name for p in data.players] == ["Alice", "Bob"]

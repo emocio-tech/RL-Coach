@@ -84,7 +84,7 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 
 ### Contenu de `stats.json` (`StatsFile`)
 - `replay_id` et `original_filename`. Ce dernier est nettoyé : basename, caractères de contrôle retirés, 255 caractères maximum.
-- `match` : `match_type`, `team_size`, `team0_score`, `team1_score`, `duration_seconds`, `map_name`, `date`. Chaque champ peut être `null`.
+- `match` : `match_type`, `team_size`, `team0_score`, `team1_score`, `duration_seconds`, `map_name`, `date`. Chaque champ peut être `null`, sauf les deux scores : le replay omet la propriété d'une équipe qui n'a pas marqué, elle vaut alors `0`.
 - `players[]` : un élément par entrée `PlayerStats` du replay.
   - Stats de base : `name`, `team`, `score`, `goals`, `assists` (= passes), `saves`, `shots` (0 si absent).
   - `demolitions` : `inflicted`, `received`.

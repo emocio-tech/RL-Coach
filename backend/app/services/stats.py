@@ -327,8 +327,8 @@ def build_match_files(
     match = MatchStats(
         match_type=properties.get("MatchType"),
         team_size=properties.get("TeamSize"),
-        team0_score=properties.get("Team0Score"),
-        team1_score=properties.get("Team1Score"),
+        team0_score=properties.get("Team0Score", 0),
+        team1_score=properties.get("Team1Score", 0),
         duration_seconds=properties.get("TotalSecondsPlayed"),
         map_name=properties.get("MapName"),
         date=properties.get("Date"),
