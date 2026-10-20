@@ -84,3 +84,33 @@ class MapFile(BaseModel):
     replay_id: str
     players: list[PlayerMap]
     ball: BallTrack
+
+
+class PlayerDetail(BaseModel):
+    tracked_time_s: float = 0.0
+    avg_speed: float | None = None
+    supersonic_pct: float | None = None
+    slow_pct: float | None = None
+    zero_boost_pct: float | None = None
+    defensive_zone_pct: float | None = None
+    mid_zone_pct: float | None = None
+    offensive_zone_pct: float | None = None
+    behind_ball_pct: float | None = None
+    avg_ball_distance: float | None = None
+    first_man_pct: float | None = None
+    second_man_pct: float | None = None
+    third_man_pct: float | None = None
+
+
+class PlayerReport(BaseModel):
+    stats: PlayerFullStats
+    detail: PlayerDetail
+
+
+class GameReport(BaseModel):
+    id: str
+    original_filename: str
+    match: MatchStats
+    players: list[PlayerReport]
+    ball_y: list[float | None] = []
+    sample_seconds: float | None = None
