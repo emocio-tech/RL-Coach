@@ -24,7 +24,7 @@ Il se compose de deux parties.
 Il décrit le déroulé du match dans le temps : position 3D, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
 
 ## Statistiques de la partie
-Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir #4 et #5.
+Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir #3 et #4.
 
 ### Statistiques du match
 L'application présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Elle présente aussi, par équipe, les statistiques de base de chaque joueur : score, buts, passes décisives, arrêts et tirs.
@@ -52,5 +52,6 @@ L'application présente deux graphiques :
 | 2 | 2026-10-20 10:33 | Dimitri FORT | issue-6-replay-upload-json-transcription |
 | 3 | 2026-10-20 11:50 | Dimitri FORT | issue-15-improve-replay-export |
 | 4 | 2026-10-20 14:54 | TatouGou | issue-4-core-match-stats |
+| 5 | 2026-10-20 15:00 | TatouGou | issue-4-core-match-stats |
 
 </details>
