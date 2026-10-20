@@ -5,7 +5,8 @@ Application d'analyse de statistiques Rocket League à partir de fichiers `.repl
 ## Stack
 - **Front** : React (Vite) dans `frontend/`
 - **Back** : Python / FastAPI dans `backend/`
-- **Stockage des replays** : `data/replays/` (ignoré par Git, créé au démarrage du back)
+- **Parsing des replays** : binaire rrrocket (dans `backend/bin/`, ignoré par Git)
+- **Stockage** : JSON dans `data/games/` (ignoré par Git, créé au démarrage du back)
 
 ## Architecture
 ```
@@ -14,7 +15,7 @@ RL-Coach/
 │   ├── app/
 │   │   ├── main.py            # création de l'app FastAPI, CORS, routers
 │   │   ├── config.py          # chemins, taille max d'upload, origines CORS
-│   │   ├── api/routes/        # endpoints HTTP (replays, stats)
+│   │   ├── api/routes/        # endpoints HTTP (replays)
 │   │   ├── services/          # storage (fichiers), parser (.replay), stats (calculs)
 │   │   └── schemas/           # modèles Pydantic des réponses
 │   ├── tests/
@@ -24,15 +25,13 @@ RL-Coach/
 │       ├── api/               # client HTTP vers le back
 │       ├── components/        # composants réutilisables (upload, tableaux, graphes)
 │       └── pages/             # pages (liste des replays, détail/stats)
-├── data/replays/              # NON suivi par Git
+├── data/games/                # NON suivi par Git
 └── CLAUDE.md
 ```
 
 ## Flux
 1. Le front envoie un `.replay` (multipart) à `POST /api/replays`.
-2. Le back valide l'extension/taille, sauvegarde dans `data/replays/` (nom UUID).
-3. `services/parser.py` extrait les données du replay (point unique à brancher sur boxcars-py / rrrocket).
-4. `services/stats.py` calcule les statistiques exposées via `GET /api/replays/{id}/stats`.
+2. Le back extrait les données via rrrocket, puis sauvegarde uniquement le json dans `data/games/` (nom UUID) ; le `.replay` n'est jamais conservé.
 
 ## Commandes
 - Back : `cd backend; python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt; uvicorn app.main:app --reload` (port 8000)
@@ -46,6 +45,6 @@ RL-Coach/
 
 ## Conventions
 - Code, noms de variables et commits en anglais ; échanges en français.
-- Ne jamais committer de fichier `.replay` ni le contenu de `data/replays/`.
+- Ne jamais committer de fichier `.replay` ni le contenu de `data/`.
 - Toute la logique métier dans `services/`, les routes restent fines.
 - Ne pas committer sans demande explicite.

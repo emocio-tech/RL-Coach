@@ -1,38 +1,54 @@
+import os
+import re
 import uuid
 from pathlib import Path
 
 from fastapi import UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.replay import ReplayInfo
+from app.schemas.replay import UploadResult
+from app.services import parser, stats
+
+CHUNK_SIZE = 1024 * 1024
 
 
-async def save_replay(file: UploadFile) -> ReplayInfo:
-    original_name = file.filename or ""
-    if not original_name.lower().endswith(config.ALLOWED_EXTENSION):
+async def save_replay(file: UploadFile) -> UploadResult:
+    name = file.filename or ""
+    if not name.lower().endswith(config.ALLOWED_EXTENSION):
         raise ValueError("Only .replay files are accepted")
 
-    content = await file.read()
-    if len(content) > config.MAX_UPLOAD_BYTES:
-        raise ValueError("File too large")
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(CHUNK_SIZE)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > config.MAX_UPLOAD_BYTES:
+            raise ValueError("File too large")
+        chunks.append(chunk)
+    if total == 0:
+        raise ValueError("Empty file")
+    content = b"".join(chunks)
 
-    config.REPLAYS_DIR.mkdir(parents=True, exist_ok=True)
+    raw = await run_in_threadpool(parser.parse_replay, content)
+
     replay_id = uuid.uuid4().hex
-    (config.REPLAYS_DIR / f"{replay_id}{config.ALLOWED_EXTENSION}").write_bytes(content)
-    return ReplayInfo(id=replay_id, filename=original_name, size_bytes=len(content))
+    original_filename = re.sub(r"[\x00-\x1f\x7f]", "", Path(name).name)[:255]
 
+    data = await run_in_threadpool(
+        stats.build_replay_data, replay_id, original_filename, raw
+    )
 
-def list_replays() -> list[ReplayInfo]:
-    if not config.REPLAYS_DIR.exists():
-        return []
-    return [
-        ReplayInfo(id=p.stem, filename=p.name, size_bytes=p.stat().st_size)
-        for p in sorted(config.REPLAYS_DIR.glob(f"*{config.ALLOWED_EXTENSION}"))
-    ]
+    config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
+    final_path = config.GAMES_DIR / f"{replay_id}{config.STORED_EXTENSION}"
+    tmp_path = config.GAMES_DIR / f"{replay_id}{config.STORED_EXTENSION}.tmp"
+    try:
+        tmp_path.write_text(data.model_dump_json(), encoding="utf-8")
+        os.replace(tmp_path, final_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
-
-def get_replay_path(replay_id: str) -> Path | None:
-    if not replay_id.isalnum():
-        return None
-    path = config.REPLAYS_DIR / f"{replay_id}{config.ALLOWED_EXTENSION}"
-    return path if path.is_file() else None
+    return UploadResult(id=replay_id)

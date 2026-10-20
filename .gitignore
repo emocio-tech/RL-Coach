@@ -1,5 +1,6 @@
-# Replays uploadés (jamais versionnés)
-data/replays/
+# Données (replays, JSON générés) et binaire rrrocket : jamais versionnés
+data/
+backend/bin/
 *.replay
 
 # Python

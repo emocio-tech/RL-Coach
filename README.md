@@ -4,12 +4,17 @@ Application d'analyse de statistiques Rocket League à partir de fichiers `.repl
 
 - **Front** : React (Vite), dans `frontend/`
 - **Back** : Python / FastAPI, dans `backend/`
-- **Stockage** : les replays sont sauvegardés dans `data/replays/` (ignoré par Git, créé au démarrage du back)
+- **Stockage** : le replay est parsé à l'upload et seul le JSON résultant est sauvegardé dans `data/games/` (ignoré par Git, créé au démarrage du back)
 
 ## Prérequis
 
 - Python 3.10+
 - Node.js 18+
+- rrrocket : binaire de parsing des replays
+
+### Installer rrrocket (Windows)
+
+Télécharger `rrrocket-0.11.8-x86_64-pc-windows-msvc.zip` depuis https://github.com/nickbabcock/rrrocket/releases/tag/v0.11.8, puis extraire `rrrocket.exe` dans `backend/bin/`. Le chemin peut être modifié via la variable d'environnement `RRROCKET_PATH`.
 
 ## Installation
 
@@ -81,9 +86,10 @@ pytest
 ## Fonctionnement
 
 1. Le front envoie un `.replay` (multipart) à `POST /api/replays`.
-2. Le back valide l'extension et la taille, puis sauvegarde le fichier dans `data/replays/` (nom UUID).
-3. `services/parser.py` extrait les données du replay (point d'entrée prévu pour boxcars-py / rrrocket).
-4. `services/stats.py` calcule les statistiques exposées via `GET /api/replays/{id}/stats`.
+2. Le back valide l'extension et la taille.
+3. `services/parser.py` extrait les données du replay via le binaire rrrocket.
+4. `services/stats.py` construit les données du match (stats, trajectoires, heatmaps).
+5. `services/storage.py` sauvegarde uniquement le JSON dans `data/games/` (nom UUID) ; le replay n'est jamais conservé.
 
 ## Structure
 
@@ -93,7 +99,7 @@ RL-Coach/
 │   ├── app/
 │   │   ├── main.py            # app FastAPI, CORS, routers
 │   │   ├── config.py          # chemins, taille max d'upload, origines CORS
-│   │   ├── api/routes/        # endpoints HTTP (replays, stats)
+│   │   ├── api/routes/        # endpoints HTTP (replays)
 │   │   ├── services/          # storage, parser, stats
 │   │   └── schemas/           # modèles Pydantic
 │   ├── tests/
@@ -103,5 +109,5 @@ RL-Coach/
 │       ├── api/               # client HTTP vers le back
 │       ├── components/        # composants réutilisables
 │       └── pages/             # liste des replays, détail/stats
-└── data/replays/              # non suivi par Git
+└── data/games/                # non suivi par Git
 ```

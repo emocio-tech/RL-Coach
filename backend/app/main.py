@@ -9,7 +9,7 @@ from app.api.routes import replays
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    config.REPLAYS_DIR.mkdir(parents=True, exist_ok=True)
+    config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
     yield
 
 
