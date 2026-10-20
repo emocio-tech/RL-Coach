@@ -21,7 +21,7 @@ Il se compose de deux parties.
 - le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir.
 
 ### Fichier `map.json`
-Il décrit le déroulé du match dans le temps : position 3D, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
+Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
 
 <details>
 <summary>Historique des versions</summary>
@@ -31,5 +31,6 @@ Il décrit le déroulé du match dans le temps : position 3D, vitesse et niveau 
 | 1 | 2026-10-19 16:29 | iwao | main |
 | 2 | 2026-10-20 10:33 | Dimitri FORT | issue-6-replay-upload-json-transcription |
 | 3 | 2026-10-20 11:50 | Dimitri FORT | issue-15-improve-replay-export |
+| 4 | 2026-10-20 14:35 | Dimitri FORT | issue-17-fix-boost-calculation |
 
 </details>
