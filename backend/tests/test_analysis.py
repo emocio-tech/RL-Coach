@@ -130,7 +130,7 @@ def test_get_stats_endpoint(client, files, games_dir):
 
     assert response.status_code == 200
     body = response.json()
-    assert body["match"]["map_name"] == "Stadium_P"
+    assert body["match"]["map_name"] == "DFH Stadium"
     assert body["players"][0]["detail"]["avg_speed"] == 500.0
     assert "demolitions" in body["players"][0]["stats"]
 

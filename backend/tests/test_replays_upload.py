@@ -273,7 +273,7 @@ def test_sanitize_strips_path_separators_and_edge_dots():
     assert not result.startswith(".")
 
 
-@pytest.mark.parametrize("method", ["get", "delete", "put"])
+@pytest.mark.parametrize("method", ["delete", "put"])
 def test_replays_collection_other_methods_not_available(client, method):
     assert getattr(client, method)("/api/replays").status_code in (404, 405)
 
@@ -313,3 +313,38 @@ def test_upload_replay_real_replay_integration(client, games_dir):
         tr = p["track"]
         assert all(len(tr[k]) == n for k in ("t", "x", "y", "z", "speed", "boost", "qx", "qy", "qz", "qw"))
         assert len(p["heatmap"]["counts"]) == 20
+
+
+def test_list_replays_returns_imported_games_most_recent_first(client, games_dir, mock_parse):
+    first = _post(client, name="first.replay").json()["id"]
+    second = _post(client, name="second.replay").json()["id"]
+    assert second != first
+    os.utime(games_dir / first / config.STATS_FILENAME, (1_000_000_000, 1_000_000_000))
+
+    response = client.get("/api/replays")
+
+    assert response.status_code == 200
+    items = response.json()
+    assert [item["id"] for item in items] == [second, first]
+    assert items[0]["original_filename"] == "second.replay"
+    assert items[0]["team0_score"] == 3
+    assert items[0]["team1_score"] == 2
+    assert items[0]["map_name"] == "DFH Stadium"
+    assert items[1]["imported_at"].startswith("2001-09-09")
+
+
+def test_list_replays_without_games_returns_empty_list(client, games_dir):
+    response = client.get("/api/replays")
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_replays_ignores_folders_without_valid_stats(client, games_dir, mock_parse):
+    valid = _post(client).json()["id"]
+    (games_dir / "broken").mkdir()
+    (games_dir / "broken" / config.STATS_FILENAME).write_text("not json", encoding="utf-8")
+    (games_dir / "empty").mkdir()
+
+    response = client.get("/api/replays")
+
+    assert [item["id"] for item in response.json()] == [valid]

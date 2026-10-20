@@ -5,6 +5,15 @@ class UploadResult(BaseModel):
     id: str
 
 
+class ReplaySummary(BaseModel):
+    id: str
+    original_filename: str
+    imported_at: str
+    team0_score: int | None = None
+    team1_score: int | None = None
+    map_name: str | None = None
+
+
 class MatchStats(BaseModel):
     match_type: str | None = None
     team_size: int | None = None

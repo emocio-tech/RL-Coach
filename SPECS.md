@@ -40,9 +40,11 @@ Il décrit le déroulé du match dans le temps : position 3D, orientation, vites
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
 
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
-- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte.
+- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie.
 
-Dès qu'un replay est importé ou sélectionné, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+
+Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
 ## Structure des pages
 Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
@@ -128,5 +130,6 @@ L'application présente deux graphiques :
 | 7 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
 | 8 | 2026-10-20 15:00 | TatouGou | issue-4-core-match-stats |
 | 9 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
+| 10 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
 
 </details>

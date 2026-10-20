@@ -14,7 +14,9 @@ Application d'analyse de statistiques Rocket League à partir de fichiers `.repl
 
 ### Installer rrrocket (Windows)
 
-Télécharger `rrrocket-0.11.8-x86_64-pc-windows-msvc.zip` depuis https://github.com/nickbabcock/rrrocket/releases/tag/v0.11.8, puis extraire `rrrocket.exe` dans `backend/bin/`. Le chemin peut être modifié via la variable d'environnement `RRROCKET_PATH`.
+Depuis la racine du dépôt : `.\scripts\install-rrrocket.ps1` (télécharge la version 0.11.8 et place `rrrocket.exe` dans `backend/bin/` ; `-Force` pour le réinstaller).
+
+Manuellement : télécharger `rrrocket-0.11.8-x86_64-pc-windows-msvc.zip` depuis https://github.com/nickbabcock/rrrocket/releases/tag/v0.11.8, puis extraire `rrrocket.exe` dans `backend/bin/`. Le chemin peut être modifié via la variable d'environnement `RRROCKET_PATH`.
 
 ## Installation
 
