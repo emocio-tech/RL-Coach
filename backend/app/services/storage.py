@@ -7,10 +7,11 @@ from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.replay import UploadResult
-from app.services import parser, stats
+from app.schemas.replay import GameReport, MapFile, StatsFile, UploadResult
+from app.services import analysis, parser, stats
 
 CHUNK_SIZE = 1024 * 1024
+GAME_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 async def save_replay(file: UploadFile) -> UploadResult:
@@ -90,3 +91,20 @@ def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
+
+
+def get_game_report(game_id: str) -> GameReport | None:
+    if not GAME_ID_PATTERN.fullmatch(game_id):
+        return None
+    folder = config.GAMES_DIR / game_id
+    stats_path = folder / config.STATS_FILENAME
+    if not stats_path.is_file():
+        return None
+    stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
+    map_path = folder / config.MAP_FILENAME
+    map_file = (
+        MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+        if map_path.is_file()
+        else None
+    )
+    return analysis.build_report(game_id, stats_file, map_file)

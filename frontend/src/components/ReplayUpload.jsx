@@ -22,9 +22,13 @@ export default function ReplayUpload({ onUploaded }) {
   }
 
   return (
-    <section>
-      <input type="file" accept=".replay" onChange={handleChange} disabled={loading} />
-      {error && <p role="alert">{error}</p>}
-    </section>
+    <>
+      <label className={`drop${loading ? " busy" : ""}`}>
+        <strong>{loading ? "Analyse en cours…" : "Importe ton fichier .replay"}</strong>
+        <span>Clique pour le chercher sur ton ordinateur</span>
+        <input type="file" accept=".replay" onChange={handleChange} disabled={loading} />
+      </label>
+      {error && <p className="alert" role="alert">{error}</p>}
+    </>
   );
 }

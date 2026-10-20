@@ -94,6 +94,26 @@ Les positions utilisées proviennent de `map.json`.
 ## Maquettes
 Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
+## Statistiques de la partie
+Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir #3 et #4.
+
+### Statistiques du match
+L'application présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Elle présente aussi, par équipe, les statistiques de base de chaque joueur : score, buts, passes décisives, arrêts et tirs.
+
+### Statistiques détaillées par joueur
+Pour un joueur choisi, l'application affiche des statistiques détaillées regroupées en quatre thèmes :
+- le déplacement : vitesse moyenne, part du temps en vitesse supersonique et part du temps à vitesse lente ;
+- le positionnement : part du temps dans les zones défensive, milieu et offensive, part du temps derrière la balle, part du temps en 1er, 2e et 3e homme de son équipe, et distance moyenne à la balle ;
+- le boost : niveau moyen, part du temps sans boost, boost consommé par minute, petits et gros boosts récupérés ;
+- les démolitions : nombre infligé et nombre reçu.
+
+Le déplacement et le positionnement sont calculés à partir de `map.json`.
+
+### Graphiques
+L'application présente deux graphiques :
+- **Momentum** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments.
+- **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie.
+
 <details>
 <summary>Historique des versions</summary>
 
@@ -104,6 +124,8 @@ Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans jo
 | 3 | 2026-10-20 11:50 | Dimitri FORT | issue-15-improve-replay-export |
 | 4 | 2026-10-20 12:20 | iwao | issue-13-interface-design |
 | 5 | 2026-10-20 14:35 | Dimitri FORT | issue-17-fix-boost-calculation |
-| 6 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
+| 6 | 2026-10-20 14:54 | TatouGou | issue-4-core-match-stats |
+| 7 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
+| 8 | 2026-10-20 15:00 | TatouGou | issue-4-core-match-stats |
 
 </details>
