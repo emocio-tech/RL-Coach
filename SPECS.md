@@ -49,7 +49,7 @@ Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structu
 
 Le header affiche le logo RL-Coach. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
 
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient le lien « Timeline ».
+La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline » et « Heatmaps ».
 
 ## Écran Vue d'ensemble
 L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sélectionnée, lues depuis ses fichiers JSON. Sa page s'intitule « Vue d'ensemble » et se compose de deux blocs.
@@ -69,7 +69,7 @@ La frise est graduée en temps, de 0:00 à la fin de la partie. Une graduation e
 
 Sur la bande de chaque joueur, une icône est placée à l'instant de chacun de ses événements : ses buts, ses passes décisives, ses tirs, ses arrêts, les démolitions qu'il cause (Kill) et celles qu'il subit (Mort). Toutes les icônes d'une bande sont sur une même ligne. Un tir qui marque est affiché comme un but, pas comme un tir.
 
-Chaque but est aussi marqué par une barre verticale en pointillés, de la couleur de l'équipe qui a marqué, qui traverse toutes les bandes. Sous la frise, alignée avec cette barre, une pastille affiche le score de la partie après ce but (par exemple « 2 – 2 » à 4:58).
+Chaque but est aussi marqué par une barre verticale en pointillés, de la couleur de l'équipe qui a marqué, qui traverse toutes les bandes. Sous la frise, alignée avec cette barre, une pastille affiche le score de la partie après ce but.
 
 Quand l'utilisateur survole une icône, un tooltip s'affiche au-dessus d'elle. Il existe un tooltip par type d'événement. Chacun indique l'instant de l'événement et :
 
@@ -80,8 +80,19 @@ Quand l'utilisateur survole une icône, un tooltip s'affiche au-dessus d'elle. I
 - Kill : le joueur qui a démoli et sa victime.
 - Mort : le joueur démoli et celui qui l'a démoli.
 
+## Écran Heatmaps
+L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».
+
+Tant qu'aucun joueur n'est sélectionné dans le menu du header, la page contient un seul bloc, « Déplacements du ballon ». Une fois un joueur sélectionné, elle contient deux blocs côte à côte : « Déplacements du joueur », à gauche, et « Déplacements du ballon », à droite.
+
+Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de celui de Rocket League, avec les deux cages : la cage bleue à gauche, la cage orange à droite. Une carte de chaleur est superposée au terrain : plus une zone est fréquentée pendant toute la durée de la partie, plus sa couleur est intense. La heatmap du joueur prend la couleur de son équipe, celle du ballon a une couleur distincte de celles des équipes.
+
+Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
+
+Les positions utilisées proviennent de `map.json`.
+
 ## Maquettes
-Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
+Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
 <details>
 <summary>Historique des versions</summary>
@@ -92,5 +103,6 @@ Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans jo
 | 2 | 2026-10-20 10:33 | Dimitri FORT | issue-6-replay-upload-json-transcription |
 | 3 | 2026-10-20 11:50 | Dimitri FORT | issue-15-improve-replay-export |
 | 4 | 2026-10-20 12:20 | iwao | issue-13-interface-design |
+| 5 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
 
 </details>
