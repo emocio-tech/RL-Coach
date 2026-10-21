@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.schemas.replay import GameReport, UploadResult
+from app.schemas.replay import GameReport, ReplaySummary, UploadResult
 from app.services import storage
 
 router = APIRouter()
@@ -12,6 +12,11 @@ async def upload_replay(file: UploadFile):
         return await storage.save_replay(file)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("", response_model=list[ReplaySummary])
+def list_replays():
+    return storage.list_games()
 
 
 @router.get("/{game_id}/stats", response_model=GameReport)

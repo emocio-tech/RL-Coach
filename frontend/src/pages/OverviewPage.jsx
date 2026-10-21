@@ -54,6 +54,18 @@ function Recap({ match, player }) {
                 <strong>{player.stats.name}</strong> · {TEAM_NAMES[player.stats.team]}
               </span>
             </div>
+            <div>
+              <span className="car-pill">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 17h14" />
+                  <path d="M3 17v-4l2-5h14l2 5v4" />
+                  <circle cx="7.5" cy="17" r="1.5" />
+                  <circle cx="16.5" cy="17" r="1.5" />
+                </svg>
+                <span className="car-pill-label">Voiture</span>
+                {fmt(player.stats.car)}
+              </span>
+            </div>
             <div className="stat-grid">
               {stats.map(([label, value]) => (
                 <div key={label} className="stat-card">
@@ -69,7 +81,7 @@ function Recap({ match, player }) {
   );
 }
 
-function TeamTable({ team, players, selected }) {
+function TeamTable({ team, players, selected, onSelectPlayer }) {
   const goals = players.reduce((sum, p) => sum + p.stats.goals, 0);
   return (
     <div className={`table-wrap ${team === 0 ? "blue" : "orange"}`}>
@@ -78,6 +90,7 @@ function TeamTable({ team, players, selected }) {
         <thead>
           <tr>
             <th scope="col">Joueur</th>
+            <th scope="col">Voiture</th>
             <th scope="col">Score</th>
             <th scope="col">Buts</th>
             <th scope="col">Passes déc.</th>
@@ -87,8 +100,20 @@ function TeamTable({ team, players, selected }) {
         </thead>
         <tbody>
           {players.map(({ stats }) => (
-            <tr key={stats.name} className={stats.name === selected ? "selected" : undefined}>
+            <tr
+              key={stats.name}
+              className={stats.name === selected ? "selected" : undefined}
+              tabIndex={0}
+              onClick={() => onSelectPlayer(stats.name)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectPlayer(stats.name);
+                }
+              }}
+            >
               <th scope="row">{stats.name}</th>
+              <td>{fmt(stats.car)}</td>
               <td className="strong">{stats.score}</td>
               <td>{stats.goals}</td>
               <td>{stats.assists}</td>
@@ -165,7 +190,7 @@ function PlayerDetails({ player }) {
   );
 }
 
-export default function OverviewPage({ report, selectedPlayer }) {
+export default function OverviewPage({ report, selectedPlayer, onSelectPlayer }) {
   const { match, players } = report;
   const player = players.find((p) => p.stats.name === selectedPlayer) ?? null;
   return (
@@ -180,6 +205,7 @@ export default function OverviewPage({ report, selectedPlayer }) {
             team={team}
             players={players.filter((p) => p.stats.team === team)}
             selected={selectedPlayer}
+            onSelectPlayer={onSelectPlayer}
           />
         ))}
       </section>

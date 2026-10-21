@@ -40,14 +40,16 @@ Il décrit le déroulé du match dans le temps : position 3D, orientation, vites
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
 
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
-- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte.
+- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie.
 
-Dès qu'un replay est importé ou sélectionné, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+
+Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
 ## Structure des pages
 Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
 
-Le header affiche le logo RL-Coach. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
+Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
 
 La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline » et « Heatmaps ».
 
@@ -56,7 +58,7 @@ L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sél
 
 Le premier bloc présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Tant qu'aucun joueur n'est sélectionné dans le menu du header, le bloc se limite à ce résultat. Une fois un joueur sélectionné, le bloc affiche aussi « Tes stats », les statistiques de ce joueur : le modèle de voiture qu'il utilise, affiché sur sa propre ligne, puis son score, ses buts, ses passes décisives, ses arrêts et ses tirs.
 
-Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence.
+Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien.
 
 ## Écran Timeline
 L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ».
@@ -138,6 +140,8 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 6 | 2026-10-20 14:54 | TatouGou | issue-4-core-match-stats |
 | 7 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
 | 8 | 2026-10-20 15:00 | TatouGou | issue-4-core-match-stats |
-| 9 | 2026-10-21 08:51 |  | issue-10-llm-chat-precision |
+| 9 | 2026-10-21 08:51 | Chauvin Matthieu | issue-10-llm-chat-precision |
+| 10 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
+| 11 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
 
 </details>

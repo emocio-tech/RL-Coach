@@ -15,6 +15,7 @@ from app.schemas.replay import (
     PlayerTrack,
     StatsFile,
 )
+from app.services import cars
 from app.services.parser import ReplayParseError
 
 CAR = "Archetypes.Car.Car_Default"
@@ -35,6 +36,8 @@ MATCH_COUNTER_EVENTS = {
     "TAGame.PRI_TA:MatchShots": "shot",
 }
 MAX_EVENTS_PER_UPDATE = 5
+CLIENT_LOADOUTS = "TAGame.PRI_TA:ClientLoadouts"
+TEAM_LOADOUT_KEYS = ("blue", "orange")
 
 PICKUP_UNAVAILABLE = 255
 SHOT_GOAL_DEDUP_WINDOW = 1.0
@@ -74,6 +77,8 @@ class _State:
         self.named_counter = {}
         self.counter_last = {}
         self.events = []
+        self.pri_loadout = {}
+        self.named_loadout = {}
 
     def add_actor(self, actor_id, name):
         self._forget(actor_id)
@@ -91,9 +96,16 @@ class _State:
         if name is not None and actor_id in self.pri_counter:
             self.named_counter[name] = self.pri_counter[actor_id]
 
+    def _snapshot_loadout(self, actor_id):
+        name = self.pri_name.get(actor_id)
+        if name is not None and actor_id in self.pri_loadout:
+            self.named_loadout[name] = self.pri_loadout[actor_id]
+
     def _forget(self, actor_id):
         self._snapshot_counter(actor_id)
+        self._snapshot_loadout(actor_id)
         self.pri_counter.pop(actor_id, None)
+        self.pri_loadout.pop(actor_id, None)
         self.pad_identity.pop(actor_id, None)
         self.cars.discard(actor_id)
         if self.ball == actor_id:
@@ -120,6 +132,12 @@ class _State:
             if value is not None:
                 self.pri_name[actor_id] = value
                 self._snapshot_counter(actor_id)
+                self._snapshot_loadout(actor_id)
+        elif name == CLIENT_LOADOUTS:
+            bodies = _loadout_bodies(attribute)
+            if bodies:
+                self.pri_loadout[actor_id] = bodies
+                self._snapshot_loadout(actor_id)
         elif name == "TAGame.CarComponent_TA:Vehicle":
             target = _active_actor(attribute)
             if actor_id in self.boosts and target is not None:
@@ -330,6 +348,30 @@ def _active_actor(attribute):
     return actor
 
 
+def _loadout_bodies(attribute):
+    """Car body ids of a ClientLoadouts attribute, as {"blue": id, "orange": id} (valid ids only)."""
+    team_loadout = attribute.get("TeamLoadout")
+    if not isinstance(team_loadout, dict):
+        return {}
+    bodies = {}
+    for key in TEAM_LOADOUT_KEYS:
+        loadout = team_loadout.get(key)
+        body = loadout.get("body") if isinstance(loadout, dict) else None
+        if isinstance(body, int) and not isinstance(body, bool) and body > 0:
+            bodies[key] = body
+    return bodies
+
+
+def _player_car(state, name, team):
+    """Car model name of a player: the body of its own team's loadout, else the other team's."""
+    bodies = state.named_loadout.get(name)
+    if not bodies:
+        return None
+    own = TEAM_LOADOUT_KEYS[team] if team in (0, 1) else None
+    body = bodies.get(own) or next(iter(bodies.values()))
+    return cars.display_name(body)
+
+
 def _actor_id(value):
     if isinstance(value, dict):
         value = value.get("actor")
@@ -418,6 +460,8 @@ def build_match_files(
     state.finalize_pads()
     for pri_id in list(state.pri_counter):
         state._snapshot_counter(pri_id)
+    for pri_id in list(state.pri_loadout):
+        state._snapshot_loadout(pri_id)
 
     duration = properties.get("TotalSecondsPlayed")
     full_players = []
@@ -441,7 +485,7 @@ def build_match_files(
             inflicted = sum(1 for a, _v in state.demolitions if a == pname)
         full_players.append(
             PlayerFullStats(
-                **stats_item.model_dump(),
+                **{**stats_item.model_dump(), "car": _player_car(state, pname, stats_item.team)},
                 demolitions=Demolitions(inflicted=inflicted, received=received),
                 boost=BoostStats(
                     small_pads=state.small_pads.get(pname, 0),

@@ -1,14 +1,15 @@
 import re
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.replay import GameReport, MapFile, PlayerMap, StatsFile, UploadResult
-from app.services import analysis, parser, stats
+from app.schemas.replay import GameReport, MapFile, PlayerMap, StatsFile, UploadResult, ReplaySummary
+from app.services import analysis, parser, stats, maps
 
 CHUNK_SIZE = 1024 * 1024
 GAME_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -92,7 +93,6 @@ def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
 
-
 def get_player_map(game_id: str, player_name: str) -> PlayerMap | None:
     """Heatmap and track of one player (name compared ignoring case), or None if unavailable."""
     if not GAME_ID_PATTERN.fullmatch(game_id):
@@ -104,6 +104,32 @@ def get_player_map(game_id: str, player_name: str) -> PlayerMap | None:
     wanted = player_name.strip().casefold()
     return next((p for p in map_file.players if p.name.casefold() == wanted), None)
 
+def list_games() -> list[ReplaySummary]:
+    """Imported games, most recent import first. The import date is the mtime of stats.json."""
+    if not config.GAMES_DIR.is_dir():
+        return []
+    games = []
+    for folder in config.GAMES_DIR.iterdir():
+        stats_path = folder / config.STATS_FILENAME
+        if not GAME_ID_PATTERN.fullmatch(folder.name) or not stats_path.is_file():
+            continue
+        try:
+            stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
+            imported_at = datetime.fromtimestamp(stats_path.stat().st_mtime, tz=timezone.utc)
+        except (OSError, ValueError):
+            continue
+        games.append(
+            ReplaySummary(
+                id=folder.name,
+                original_filename=stats_file.original_filename,
+                imported_at=imported_at.isoformat(),
+                team0_score=stats_file.match.team0_score,
+                team1_score=stats_file.match.team1_score,
+                map_name=maps.display_name(stats_file.match.map_name),
+            )
+        )
+    return sorted(games, key=lambda game: game.imported_at, reverse=True)
+
 
 def get_game_report(game_id: str) -> GameReport | None:
     if not GAME_ID_PATTERN.fullmatch(game_id):
@@ -113,6 +139,7 @@ def get_game_report(game_id: str) -> GameReport | None:
     if not stats_path.is_file():
         return None
     stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
+    stats_file.match.map_name = maps.display_name(stats_file.match.map_name)
     map_path = folder / config.MAP_FILENAME
     map_file = (
         MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
