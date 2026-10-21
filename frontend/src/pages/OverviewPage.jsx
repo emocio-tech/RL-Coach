@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MomentumChart, StyleRadar } from "../components/Charts.jsx";
 import { TEAM_NAMES } from "../components/Layout.jsx";
+import { sortPlayers } from "../components/playerOrder.js";
 
 const fmt = (value, suffix = "") =>
   value === null || value === undefined ? "—" : `${value}${suffix}`;
@@ -232,7 +233,7 @@ export default function OverviewPage({ report, selectedPlayer, onSelectPlayer })
           <TeamTable
             key={team}
             team={team}
-            players={players.filter((p) => p.stats.team === team)}
+            players={sortPlayers(players.filter((p) => p.stats.team === team), (p) => p.stats)}
             selected={selectedPlayer}
             onSelectPlayer={onSelectPlayer}
           />

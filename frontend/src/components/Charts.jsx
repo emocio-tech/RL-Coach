@@ -1,5 +1,5 @@
-
 import { memo, useId, useMemo,useState } from "react";
+import { sortPlayers } from "./playerOrder.js";
 const FIELD_HALF_LENGTH = 5120;
 
 // Ball position along the long axis over time. Team 0 (blue) defends the negative y side:
@@ -167,8 +167,7 @@ function playerColor(team, rank) {
 // Players sorted by team then name, each with its colour and dash flag.
 function styledPlayers(players) {
   const ranks = new Map();
-  return [...players]
-    .sort((a, b) => a.stats.team - b.stats.team || a.stats.name.localeCompare(b.stats.name))
+  return sortPlayers(players, (p) => p.stats)
     .map((player) => {
       const team = player.stats.team;
       const rank = ranks.get(team) ?? 0;

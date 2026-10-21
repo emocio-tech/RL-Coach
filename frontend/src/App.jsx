@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import { getReplayStats } from "./api/client.js";
 import ChatBubble from "./components/ChatBubble.jsx";
 import Layout from "./components/Layout.jsx";
+import { sortPlayers } from "./components/playerOrder.js";
 import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
 import OverviewPage from "./pages/OverviewPage.jsx";
@@ -75,7 +76,11 @@ export default function App() {
     }
   }
 
-  const playerNames = useMemo(() => report?.players.map((p) => p.stats.name), [report]);
+  const sortedPlayers = useMemo(
+    () => (report ? sortPlayers(report.players.map((p) => p.stats)) : null),
+    [report]
+  );
+  const playerNames = useMemo(() => sortedPlayers?.map((p) => p.name), [sortedPlayers]);
 
   const onHome = page === "home" || !report;
 
@@ -92,7 +97,7 @@ export default function App() {
       <Layout
         page={page}
         onNavigate={setPage}
-        players={report.players.map((p) => p.stats)}
+        players={sortedPlayers}
         selectedPlayer={selectedPlayer}
         onSelectPlayer={setSelectedPlayer}
       >

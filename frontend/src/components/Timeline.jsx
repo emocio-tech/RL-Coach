@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { sortPlayers } from "./playerOrder";
 import { buildTimelineEvents } from "./timelineEvents";
 
 const TYPES = {
@@ -209,11 +210,7 @@ export default function Timeline({ report, selectedPlayer, onSelectEvent, curren
   }
 
   const players = report.players.map((p) => p.stats);
-  const lanes = [0, 1].flatMap((team) =>
-    players
-      .filter((p) => p.team === team)
-      .sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }))
-  );
+  const lanes = sortPlayers(players);
   const teamByName = new Map(players.map((p) => [p.name, p.team]));
   const teamOf = (name) => teamByName.get(name);
   const ticks = buildTicks(duration);
