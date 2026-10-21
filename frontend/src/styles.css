@@ -101,6 +101,11 @@ html { scroll-padding-top: 90px; }
 .sidebar {
   flex: 0 0 240px; min-width: 0; background: var(--bar); padding: 24px 16px;
   display: flex; flex-direction: column; gap: 8px; border-right: 4px solid #121b4d;
+  position: sticky; top: 84px; align-self: flex-start; height: calc(100vh - 84px); overflow-y: auto;
+}
+/* Sidebar wraps above the content on narrow screens: let it scroll with the page */
+@media (max-width: 800px) {
+  .sidebar { position: static; height: auto; }
 }
 .nav-group { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .nav-title { padding: 0 16px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--blue-soft); }

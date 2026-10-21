@@ -66,7 +66,7 @@ Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structu
 
 Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents), sous un en-tête non sélectionnable par équipe. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé. Voir [#21](https://github.com/emocio-tech/RL-Coach/issues/21) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
 
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Heatmaps », « Replay » et « Positionnement ». Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
+La sidebar permet de naviguer entre les pages. Comme le header, elle reste fixe à gauche de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où elle défile avec la page. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Heatmaps », « Replay » et « Positionnement ». Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
 
 ### Écran d'accueil
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
@@ -215,5 +215,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
 | 17 | 2026-10-21 15:00 | iwao | issue-41-3d-view-improvements |
 | 18 | 2026-10-21 16:32 | iwao | issue-41-3d-view-improvements |
+| 19 | 2026-10-21 16:40 | iwao | issue-41-3d-view-improvements |
 
 </details>
