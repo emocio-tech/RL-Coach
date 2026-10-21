@@ -1,7 +1,7 @@
-# Vue 3D du match
+# Replay du match
 
 ## Résumé fonctionnel
-L'écran « Vue 3D » rejoue une partie importée en 3D : terrain, balle et voitures de tous les joueurs, positionnés et orientés comme dans le replay. Le front récupère les trajectoires auprès du back, puis anime la scène dans le navigateur. L'utilisateur lance, met en pause et déplace la lecture, change la vitesse (de ×0,25 à ×4) et choisit parmi cinq caméras : libre, diffusion, cam balle, poursuite et vue de dessus. Sous la rediffusion, la frise du match est reprise de l'écran Timeline : cliquer sur un événement amène la rediffusion 3 secondes avant cet événement et la lance.
+L'écran « Replay » rejoue une partie importée en 3D : terrain, balle et voitures de tous les joueurs, positionnés et orientés comme dans le replay. Le front récupère les trajectoires auprès du back, puis anime la scène dans le navigateur. L'utilisateur lance, met en pause et déplace la lecture, change la vitesse (de ×0,25 à ×4) et choisit parmi cinq caméras : libre, diffusion, cam balle, poursuite et vue de dessus. Sous la rediffusion, la frise du match est celle décrite dans `docs/timeline-events.md` : cliquer sur un événement amène la rediffusion 3 secondes avant cet événement et la lance.
 
 ### Exemple concret
 ```bash
@@ -23,7 +23,7 @@ Réponse `200` (valeurs illustratives, tronquées à trois échantillons) :
   "ball": {"t": [0.0, 0.2, 0.4], "x": [0.0, 0.0, 12.4], "y": [0.0, 0.0, 80.1], "z": [92.8, 92.8, 95.0]}
 }
 ```
-Quand le joueur Pseudo est démoli (valeurs `null`), sa voiture disparaît de la scène jusqu'à sa réapparition. En cliquant sur le but de Pseudo à 1:30 dans la frise, la rediffusion se place à 1:27 et se lance. Si la caméra est « Cam balle » ou « Poursuite », Pseudo est aussi sélectionné et la caméra le suit.
+Quand le joueur Pseudo est démoli (valeurs `null`), sa voiture disparaît de la scène jusqu'à sa réapparition. En cliquant sur le but de Pseudo à 1:30 dans la frise, la rediffusion se place à 1:27 et se lance. Si la caméra est « Cam balle » ou « Poursuite », Pseudo est aussi sélectionné et la caméra le suit. Cliquer sur la carte d'un joueur le sélectionne et passe la caméra en « Cam balle » sur lui, même s'il était déjà sélectionné.
 
 ## Description technique
 
@@ -72,4 +72,4 @@ Dans ces trois cas, le front affiche le message à la place de la rediffusion.
 - Le terrain est le même pour toutes les cartes.
 - L'état des pads de boost (récupéré ou non) n'est pas affiché, car les données ne le contiennent pas.
 - La rotation de la balle est estimée à partir de son déplacement, car elle n'est pas dans les données.
-- Pas de test automatique côté front : le projet n'a pas d'outil de test pour le front.
+- Pas de test automatique de la page elle-même (Vitest ne couvre que des utilitaires, dont `playerOrder.js`) ; voir `docs/replay-improvements.md`.

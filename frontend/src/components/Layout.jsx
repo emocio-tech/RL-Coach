@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { groupByTeam } from "./playerOrder.js";
 
 export const TEAM_NAMES = { 0: "Équipe bleue", 1: "Équipe orange" };
 const TEAM_DOT = { 0: "var(--blue-light)", 1: "var(--orange)" };
@@ -44,19 +45,30 @@ function PlayerSelect({ players, selected, onSelect }) {
       </button>
       {open && (
         <div role="listbox" aria-label="Joueurs de la partie" className="listbox">
-          {players.map((p) => (
-            <button
-              key={p.name}
-              type="button"
-              role="option"
-              className="option"
-              aria-selected={p.name === selected}
-              onClick={() => pick(p.name)}
-            >
-              <span className="dot" style={{ background: TEAM_DOT[p.team] }} />
-              <span className="option-name">{p.name}</span>
-              <span className="option-team">{TEAM_NAMES[p.team]}</span>
-            </button>
+          {groupByTeam(players).map((group) => (
+            <div key={group.team ?? "none"} role="group" aria-labelledby={`team-${group.team ?? "none"}`} className="option-group">
+              <span
+                id={`team-${group.team ?? "none"}`}
+                className="option-group-title"
+                style={{ color: TEAM_DOT[group.team] ?? "var(--muted)" }}
+              >
+                {TEAM_NAMES[group.team] ?? "Sans équipe"}
+              </span>
+              {group.players.map((p) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  role="option"
+                  className="option"
+                  aria-selected={p.name === selected}
+                  onClick={() => pick(p.name)}
+                >
+                  <span className="dot" style={{ background: TEAM_DOT[p.team] }} />
+                  <span className="option-name">{p.name}</span>
+                  <span className="option-team">{TEAM_NAMES[p.team]}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </div>
       )}
@@ -68,7 +80,6 @@ function PlayerSelect({ players, selected, onSelect }) {
 const NAV_ICONS = {
   home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
   overview: <><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></>,
-  timeline: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   match3d: <><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
   positioning: <><path d="M3 17l5-6 4 3 5-8 4 5" /><path d="M3 21h18" /></>,
 };
@@ -106,8 +117,7 @@ export default function Layout({ page, onNavigate, players, selectedPlayer, onSe
           </div>
           <div className="nav-group" role="group" aria-labelledby="nav-flow">
             <span id="nav-flow" className="nav-title">Déroulé</span>
-            <NavLink id="timeline" page={page} onNavigate={onNavigate}>Timeline</NavLink>
-            <NavLink id="match3d" page={page} onNavigate={onNavigate}>Vue 3D</NavLink>
+            <NavLink id="match3d" page={page} onNavigate={onNavigate}>Replay</NavLink>
             <NavLink id="positioning" page={page} onNavigate={onNavigate}>Positionnement</NavLink>
           </div>
         </nav>

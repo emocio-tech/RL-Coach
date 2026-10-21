@@ -12,9 +12,8 @@
   - [Section Statistiques](#section-statistiques)
     - [Écran Vue d'ensemble](#écran-vue-densemble)
   - [Section Déroulé](#section-déroulé)
-    - [Écran Timeline](#écran-timeline)
     - [Écran Heatmaps](#écran-heatmaps)
-    - [Écran Vue 3D](#écran-vue-3d)
+    - [Écran Replay](#écran-replay)
     - [Écran Positionnement](#écran-positionnement)
 - [Maquettes](#maquettes)
 - [Statistiques de la partie](#statistiques-de-la-partie)
@@ -65,9 +64,9 @@ Les écrans de l'application sont décrits dans l'ordre où l'utilisateur les re
 ### Structure des écrans
 Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
 
-Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé. Voir [#21](https://github.com/emocio-tech/RL-Coach/issues/21) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
+Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents), sous un en-tête non sélectionnable par équipe. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé. Voir [#21](https://github.com/emocio-tech/RL-Coach/issues/21) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
 
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps », « Vue 3D » et « Positionnement ». Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
+La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Heatmaps », « Replay » et « Positionnement ». Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
 
 ### Écran d'accueil
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
@@ -96,8 +95,30 @@ Le quatrième bloc, « Style de jeu », affiche le radar décrit dans « Graphiq
 ### Section Déroulé
 La section « Déroulé » de la sidebar regroupe les écrans qui présentent le déroulé de la partie.
 
-#### Écran Timeline
-L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ». Voir [#9](https://github.com/emocio-tech/RL-Coach/issues/9).
+#### Écran Heatmaps
+L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».
+
+Tant qu'aucun joueur n'est sélectionné dans le menu du header, la page contient un seul bloc, « Déplacements du ballon ». Une fois un joueur sélectionné, elle contient deux blocs côte à côte : « Déplacements du joueur », à gauche, et « Déplacements du ballon », à droite.
+
+Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de celui de Rocket League, avec les deux cages : la cage bleue à gauche, la cage orange à droite. Une carte de chaleur est superposée au terrain : plus une zone est fréquentée pendant toute la durée de la partie, plus sa couleur est intense. La heatmap du joueur prend la couleur de son équipe, celle du ballon a une couleur distincte de celles des équipes.
+
+Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
+
+Les positions utilisées proviennent de `map.json`.
+
+#### Écran Replay
+L'écran Replay rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Replay » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8) et, pour la frise, [#9](https://github.com/emocio-tech/RL-Coach/issues/9). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
+
+Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
+
+Le bloc affiche aussi :
+- le score et le chrono de la rediffusion, calculés à partir des buts, et un bandeau « BUT ! » avec le buteur et le passeur pendant 4 secondes après chaque but ;
+- une carte par joueur (classées par équipe, bleue puis orange, puis par ordre alphabétique des noms) indiquant son niveau de boost et sa vitesse en km/h. Cliquer sur une carte sélectionne le joueur, comme le menu du header, et passe la caméra en cam balle sur ce joueur (y compris si la carte est déjà sélectionnée) ;
+- des commandes de lecture : un bouton lecture/pause (icônes triangle et double barre, sans texte ; son libellé accessible est « Pause », « Lecture » ou « Rejouer » une fois la partie terminée), barre de temps avec les buts et les démolitions repérés, et vitesse de lecture de ×0,25 à ×4.
+
+L'utilisateur choisit parmi cinq caméras : libre (à la souris), diffusion, cam balle, poursuite et vue de dessus. Cam balle et poursuite suivent le joueur sélectionné, ou le premier joueur de la liste triée si aucun n'est sélectionné.
+
+Le second bloc, « Frise du match », présente le déroulé de la partie sous la forme d'une frise chronologique, avec un curseur qui indique l'instant de la rediffusion. Cliquer sur un événement amène la rediffusion 3 secondes avant cet événement et la lance. Si la caméra est cam balle ou poursuite, le joueur de l'événement est aussi sélectionné.
 
 Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, démolition (démolition causée) et détruit (démolition subie). Cliquer sur un type de la légende masque les événements de ce type sur la frise, et un nouveau clic les réaffiche ; un type masqué est grisé et barré dans la légende. Masquer les buts masque aussi leurs barres verticales et les pastilles de score. Tous les types sont affichés à l'arrivée sur l'écran.
 
@@ -118,31 +139,6 @@ Quand l'utilisateur survole une icône, un tooltip s'affiche au-dessus d'elle. I
 - Démolition : le joueur qui a démoli et sa victime.
 - Détruit : le joueur démoli et celui qui l'a démoli.
 
-#### Écran Heatmaps
-L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».
-
-Tant qu'aucun joueur n'est sélectionné dans le menu du header, la page contient un seul bloc, « Déplacements du ballon ». Une fois un joueur sélectionné, elle contient deux blocs côte à côte : « Déplacements du joueur », à gauche, et « Déplacements du ballon », à droite.
-
-Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de celui de Rocket League, avec les deux cages : la cage bleue à gauche, la cage orange à droite. Une carte de chaleur est superposée au terrain : plus une zone est fréquentée pendant toute la durée de la partie, plus sa couleur est intense. La heatmap du joueur prend la couleur de son équipe, celle du ballon a une couleur distincte de celles des équipes.
-
-Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
-
-Les positions utilisées proviennent de `map.json`.
-
-#### Écran Vue 3D
-L'écran Vue 3D rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Vue 3D » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
-
-Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
-
-Le bloc affiche aussi :
-- le score et le chrono de la rediffusion, calculés à partir des buts, et un bandeau « BUT ! » avec le buteur et le passeur pendant 4 secondes après chaque but ;
-- une carte par joueur indiquant son niveau de boost et sa vitesse en km/h. Cliquer sur une carte sélectionne le joueur, comme le menu du header ;
-- des commandes de lecture : lecture/pause, barre de temps avec les buts et les démolitions repérés, et vitesse de lecture de ×0,25 à ×4.
-
-L'utilisateur choisit parmi cinq caméras : libre (à la souris), diffusion, cam balle, poursuite et vue de dessus. Cam balle et poursuite suivent le joueur sélectionné, ou le premier joueur de la liste si aucun n'est sélectionné.
-
-Le second bloc, « Frise du match », reprend la frise de l'écran Timeline, avec un curseur qui indique l'instant de la rediffusion. Cliquer sur un événement amène la rediffusion 3 secondes avant cet événement et la lance. Si la caméra est cam balle ou poursuite, le joueur de l'événement est aussi sélectionné.
-
 Si la partie n'a pas de données de position, un message l'indique à la place de la rediffusion.
 
 #### Écran Positionnement
@@ -159,7 +155,7 @@ Sur les deux graphiques, la molette de la souris zoome et dézoome sur l'axe du 
 Les positions utilisées proviennent de `map.json`.
 
 ## Maquettes
-Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
+Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de la frise de l'écran Replay et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
 ## Statistiques de la partie
 Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir [#3](https://github.com/emocio-tech/RL-Coach/issues/3) et [#4](https://github.com/emocio-tech/RL-Coach/issues/4).
@@ -182,7 +178,7 @@ L'application présente trois graphiques :
 - **Distance à la balle** : la distance entre le joueur sélectionné et la balle au fil de la partie. Il s'affiche sur l'écran Positionnement. Voir [#35](https://github.com/emocio-tech/RL-Coach/issues/35).
 - **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés. Voir [#32](https://github.com/emocio-tech/RL-Coach/issues/32) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
   - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms (insensible à la casse et aux accents) au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
-  - La légende liste les joueurs par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Elle est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
+  - La légende liste les joueurs par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Elle est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la frise de l'écran Replay), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
   - Un bouton « Comparaison » / « Un graphique par joueur » dans l'en-tête du graphique (absent s'il n'y a qu'un joueur) permet d'afficher un petit radar par joueur, bleus puis oranges, avec le nom dans sa couleur et les mêmes maxima. Tous les joueurs y sont affichés, les masquages ne s'appliquent pas. Ils sont conservés au retour sur la comparaison. Changer de partie réinitialise le mode d'affichage et les masquages.
 
 ## Coach IA (chat)
@@ -217,5 +213,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 14 | 2026-10-21 10:44 | Dimitri FORT | issue-32-game-style-graphics |
 | 15 | 2026-10-21 11:26 | Dimitri FORT | issue-38-sort-header-players |
 | 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
+| 17 | 2026-10-21 15:00 | iwao | issue-41-3d-view-improvements |
 
 </details>
