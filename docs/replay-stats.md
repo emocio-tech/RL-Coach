@@ -1,7 +1,7 @@
 # Stats d'une partie : match, joueurs et graphiques
 
 ## Résumé fonctionnel
-Une fois un replay importé, le front appelle le back pour récupérer le rapport de la partie. Ce rapport réunit les stats du match (score, durée, mode, carte), les stats de base de chaque joueur, des stats détaillées calculées à partir des trajectoires (vitesse, positionnement, boost, démolitions) et la position de la balle au fil du temps. Le front en tire l'écran « Vue d'ensemble » : récap et tableaux par équipe, stats détaillées du joueur sélectionné, graphique de momentum (quelle équipe pousse) et radar de style de jeu.
+Une fois un replay importé, le front appelle le back pour récupérer le rapport de la partie. Ce rapport réunit les stats du match (score, durée, mode, carte), les stats de base de chaque joueur, des stats détaillées calculées à partir des trajectoires (vitesse, positionnement, boost, démolitions) et la position de la balle au fil du temps. Le front en tire l'écran « Vue d'ensemble » : récap et tableaux par équipe, stats détaillées du joueur sélectionné, graphique de momentum (quelle équipe pousse) et radar de style de jeu (comparaison des joueurs, avec une couleur par équipe, un masquage des joueurs via la légende et une vue « un graphique par joueur »).
 
 ### Exemple concret
 ```bash
@@ -76,7 +76,7 @@ Toutes les parts sont en pourcentage, arrondies à 0,1. Un champ vaut `null` qua
 | `map.json` absent | `200` : les `detail` sont vides (`tracked_time_s` à 0, le reste à `null`), `ball_y` vide, `sample_seconds` à `null`. |
 
 ### Affichage
-Le momentum et le radar sont dessinés par le front (`frontend/src/components/Charts.jsx`) à partir de ce rapport. Le momentum utilise `ball_y` : une balle côté positif de y indique une pression de l'équipe bleue. Le radar compare les joueurs sur la vitesse moyenne, le boost moyen, `supersonic_pct`, `first_man_pct` et `behind_ball_pct`, chaque axe étant ramené au meilleur joueur de la partie.
+Le momentum et le radar sont dessinés par le front (`frontend/src/components/Charts.jsx`, section `StyleSection` de `frontend/src/pages/OverviewPage.jsx`) à partir de ce rapport. Le momentum utilise `ball_y` : une balle côté positif de y indique une pression de l'équipe bleue. Le radar compare les joueurs sur la vitesse moyenne, le boost moyen, `supersonic_pct`, `first_man_pct` et `behind_ball_pct`. Le back ne calcule aucune normalisation : le front ramène chaque axe au meilleur joueur de la partie (100 % = maximum de l'axe). Ces maxima sont calculés sur tous les joueurs, y compris ceux masqués via la légende, et sont les mêmes dans la vue « un graphique par joueur » : l'échelle reste stable quand on masque ou réaffiche un joueur. Les couleurs (palette froide pour l'équipe bleue, chaude pour l'orange) et le masquage sont purement côté front.
 
 ### Périmètre et limites
 - Les stats détaillées sont calculées à chaque appel, à partir de `stats.json` et `map.json`. Rien n'est stocké en plus.

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MomentumChart, StyleRadar } from "../components/Charts.jsx";
 import { TEAM_NAMES } from "../components/Layout.jsx";
 
@@ -190,6 +191,34 @@ function PlayerDetails({ player }) {
   );
 }
 
+const RADAR_VIEWS = [
+  ["compare", "Comparaison"],
+  ["players", "Un graphique par joueur"],
+];
+
+function StyleSection({ players }) {
+  const [view, setView] = useState("compare");
+  const canSwitch = players.length > 1;
+  return (
+    <section className="card" aria-labelledby="radar-title">
+      <div className="radar-head">
+        <h2 id="radar-title" className="title card-title">Style de jeu</h2>
+        {canSwitch && (
+          <div className="radar-view-switch" role="group" aria-label="Affichage du radar">
+            {RADAR_VIEWS.map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="card-note">Chaque axe est comparé au meilleur des joueurs de la partie (100 %).</p>
+      <StyleRadar players={players} view={canSwitch ? view : "compare"} />
+    </section>
+  );
+}
+
 export default function OverviewPage({ report, selectedPlayer, onSelectPlayer }) {
   const { match, players } = report;
   const player = players.find((p) => p.stats.name === selectedPlayer) ?? null;
@@ -224,11 +253,7 @@ export default function OverviewPage({ report, selectedPlayer, onSelectPlayer })
         <p className="card-note">Où se trouvait la balle au fil du match : plus la zone est haute, plus l'équipe bleue pousse.</p>
         <MomentumChart ballY={report.ball_y} sampleSeconds={report.sample_seconds} />
       </section>
-      <section className="card" aria-labelledby="radar-title">
-        <h2 id="radar-title" className="title card-title">Style de jeu</h2>
-        <p className="card-note">Chaque axe est comparé au meilleur des joueurs de la partie (100 %).</p>
-        <StyleRadar players={players} />
-      </section>
+      <StyleSection key={report.id} players={players} />
     </>
   );
 }
