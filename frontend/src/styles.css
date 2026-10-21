@@ -192,6 +192,8 @@ td.strong { font-weight: 700; }
 .timeline-legend-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
 /* Own stacking context (z-index 1) keeps the tooltips below the sticky header (z-index 5). */
 .timeline-scroll { position: relative; z-index: 1; overflow-x: auto; padding-top: 180px; margin-top: -180px; }
+/* While a tooltip is shown, the scroll area goes above the legend (z-index 2) so the card covers it; still below the header. */
+.timeline-scroll:has(.timeline-tip) { z-index: 3; }
 .timeline-inner { min-width: 900px; display: flex; flex-direction: column; gap: 8px; }
 .timeline-axis-row { display: flex; align-items: flex-end; }
 .timeline-axis-spacer { flex: 0 0 153px; }
