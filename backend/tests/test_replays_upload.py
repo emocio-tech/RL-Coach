@@ -2,6 +2,8 @@ import asyncio
 import io
 import json
 import os
+import shutil
+import threading
 from pathlib import Path
 
 import pytest
@@ -175,15 +177,124 @@ def test_upload_replay_missing_binary_returns_500(client, games_dir, monkeypatch
     assert _files(games_dir) == []
 
 
-def test_upload_replay_same_replay_twice_gets_suffixed_folder_and_distinct_ids(client, games_dir, mock_parse):
-    a = _post(client).json()["id"]
-    b = _post(client).json()["id"]
-    c = _post(client).json()["id"]
-    assert (a, b, c) == (FOLDER_NAME, f"{FOLDER_NAME}_2", f"{FOLDER_NAME}_3")
-    assert sorted(f.name for f in _files(games_dir)) == sorted([a, b, c])
-    for folder in (a, b, c):
-        assert (games_dir / folder / "stats.json").is_file()
-        assert (games_dir / folder / "map.json").is_file()
+def _post_id(client, fake_raw, replay_id, **kwargs):
+    """Upload the (mocked) replay under the given properties Id; returns the folder id."""
+    fake_raw["properties"]["Id"] = replay_id
+    return _post(client, **kwargs).json()["id"]
+
+
+def test_upload_replay_same_replay_twice_stores_one_folder_and_returns_same_id(client, games_dir, mock_parse):
+    first = _post(client)
+    second = _post(client)
+    assert first.status_code == second.status_code == 201
+    assert first.json()["id"] == second.json()["id"] == FOLDER_NAME
+    assert [f.name for f in _files(games_dir)] == [FOLDER_NAME]
+    assert not list(games_dir.glob(".tmp-*"))
+    assert sorted(f.name for f in (games_dir / FOLDER_NAME).iterdir()) == ["map.json", "stats.json"]
+
+
+def test_upload_replay_duplicate_leaves_existing_stats_untouched(client, games_dir, mock_parse):
+    folder = _post(client, name="first.replay").json()["id"]
+    stats_path = games_dir / folder / config.STATS_FILENAME
+    os.utime(stats_path, (1_000_000_000, 1_000_000_000))
+    before_text = stats_path.read_text(encoding="utf-8")
+    before_mtime = stats_path.stat().st_mtime_ns
+
+    _post(client, name="second.replay")
+
+    assert stats_path.read_text(encoding="utf-8") == before_text
+    assert stats_path.stat().st_mtime_ns == before_mtime
+    assert _stats_of(games_dir, folder)["original_filename"] == "first.replay"
+
+
+def test_upload_replay_different_replays_same_folder_name_get_suffix(client, games_dir, mock_parse, fake_raw):
+    prefix = "a" * 64
+    a = _post_id(client, fake_raw, prefix + "1")
+    b = _post_id(client, fake_raw, prefix + "2")
+    assert b == f"{a}_2"
+    assert sorted(f.name for f in _files(games_dir)) == sorted([a, b])
+    assert _stats_of(games_dir, a)["replay_id"] == prefix + "1"
+    assert _stats_of(games_dir, b)["replay_id"] == prefix + "2"
+
+
+def test_upload_replay_duplicate_of_legacy_suffixed_folder_returns_it(client, games_dir, mock_parse):
+    original = _post(client).json()["id"]
+    (games_dir / original).rename(games_dir / f"{FOLDER_NAME}_2")
+
+    assert _post(client).json()["id"] == f"{FOLDER_NAME}_2"
+    assert [f.name for f in _files(games_dir)] == [f"{FOLDER_NAME}_2"]
+
+
+def test_upload_replay_multiple_folders_same_replay_id_returns_first_by_name(client, games_dir, mock_parse):
+    original = _post(client).json()["id"]
+    shutil.copytree(games_dir / original, games_dir / f"{original}_2")
+
+    assert _post(client).json()["id"] == FOLDER_NAME
+    assert len(_files(games_dir)) == 2
+
+
+@pytest.mark.parametrize(
+    "stats_content",
+    [
+        None,
+        "not json",
+        "[1, 2]",
+        '"text"',
+        "null",
+        "{}",
+        json.dumps({"replay_id": "OTHER"}),
+    ],
+    ids=["missing", "invalid_json", "list", "string", "null", "no_replay_id", "other_replay_id"],
+)
+def test_upload_replay_existing_folder_without_valid_stats_is_ignored(client, games_dir, mock_parse, stats_content):
+    junk = games_dir / "junk"
+    junk.mkdir(parents=True)
+    if stats_content is not None:
+        (junk / config.STATS_FILENAME).write_text(stats_content, encoding="utf-8")
+
+    response = _post(client)
+
+    assert response.status_code == 201
+    assert response.json()["id"] == FOLDER_NAME
+    assert sorted(f.name for f in _files(games_dir)) == sorted(["junk", FOLDER_NAME])
+
+
+def test_upload_replay_stray_file_in_games_dir_is_ignored(client, games_dir, mock_parse):
+    games_dir.mkdir(parents=True)
+    (games_dir / "note.txt").write_text("x", encoding="utf-8")
+    assert _post(client).json()["id"] == FOLDER_NAME
+
+
+def test_upload_replay_duplicate_detected_even_without_map_json(client, games_dir, mock_parse):
+    folder = _post(client).json()["id"]
+    (games_dir / folder / config.MAP_FILENAME).unlink()
+
+    assert _post(client).json()["id"] == folder
+    assert [f.name for f in _files(games_dir)] == [folder]
+    assert not (games_dir / folder / config.MAP_FILENAME).exists()
+
+
+def test_upload_replay_same_replay_posted_concurrently_stores_one_folder(games_dir, mock_parse):
+    barrier = threading.Barrier(4)
+    results, errors = [], []
+
+    def worker():
+        try:
+            upload = UploadFile(file=io.BytesIO(b"REPLAYDATA"), filename="game.replay")
+            barrier.wait()
+            results.append(asyncio.run(storage.save_replay(upload)).id)
+        except Exception as exc:  # pragma: no cover - reported by the assertion below
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    assert results == [FOLDER_NAME] * 4
+    assert [f.name for f in _files(games_dir)] == [FOLDER_NAME]
 
 
 def test_upload_replay_missing_id_generates_unique_name(client, games_dir, monkeypatch, fake_raw):
@@ -195,6 +306,7 @@ def test_upload_replay_missing_id_generates_unique_name(client, games_dir, monke
     assert a.startswith(prefix) and b.startswith(prefix)
     assert len(a) - len(prefix) == 32 and int(a[len(prefix):], 16) >= 0
     assert a != b
+    assert len(_files(games_dir)) == 2
     assert _stats_of(games_dir, a)["replay_id"] == a[len(prefix):]
 
 
@@ -315,9 +427,9 @@ def test_upload_replay_real_replay_integration(client, games_dir):
         assert len(p["heatmap"]["counts"]) == 20
 
 
-def test_list_replays_returns_imported_games_most_recent_first(client, games_dir, mock_parse):
-    first = _post(client, name="first.replay").json()["id"]
-    second = _post(client, name="second.replay").json()["id"]
+def test_list_replays_returns_imported_games_most_recent_first(client, games_dir, mock_parse, fake_raw):
+    first = _post_id(client, fake_raw, "ID_FIRST", name="first.replay")
+    second = _post_id(client, fake_raw, "ID_SECOND", name="second.replay")
     assert second != first
     os.utime(games_dir / first / config.STATS_FILENAME, (1_000_000_000, 1_000_000_000))
 
