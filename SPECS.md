@@ -29,12 +29,12 @@ RL-Coach est une application web d'analyse de statistiques Rocket League, à par
 L'application a un front en React avec TypeScript et un back en Python avec FastAPI. Le front communique avec le back via l'API HTTP exposée par ce dernier.
 
 ## Identité visuelle
-L'interface est colorée et ludique. Elle reprend les couleurs de Rocket League, le bleu et l'orange, qui représentent aussi les deux équipes d'une partie. La typographie est de style « fun », en cohérence avec l'univers du jeu.
+L'interface est colorée et ludique. Elle reprend les couleurs de Rocket League, le bleu et l'orange, qui représentent aussi les deux équipes d'une partie. La typographie est de style « fun », en cohérence avec l'univers du jeu. Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
 
 Les textes de l'interface s'adressent à l'utilisateur à la deuxième personne du singulier (par exemple « Tes stats », « Importe un nouveau replay »).
 
 ## Import et stockage des replays
-L'application ne conserve pas les fichiers de replay. À l'import, le back extrait du replay les données du match et les enregistre dans deux fichiers JSON, `stats.json` et `map.json`, placés dans un même dossier de `data/games/`. Le fichier `.replay` n'est pas sauvegardé : seuls les JSON sont conservés. Ils ne contiennent que les informations utiles à l'application et sont plus compacts que le replay d'origine.
+L'application ne conserve pas les fichiers de replay. À l'import, le back extrait du replay les données du match et les enregistre dans deux fichiers JSON, `stats.json` et `map.json`, placés dans un même dossier de `data/games/`. Le fichier `.replay` n'est pas sauvegardé : seuls les JSON sont conservés. Ils ne contiennent que les informations utiles à l'application et sont plus compacts que le replay d'origine. Voir [#6](https://github.com/emocio-tech/RL-Coach/issues/6).
 
 L'import a lieu quand l'utilisateur importe un nouveau fichier de replay depuis son ordinateur. Sélectionner une partie déjà importée dans le menu de l'écran d'accueil n'envoie aucun fichier. L'import se déroule ainsi :
 
@@ -42,22 +42,22 @@ L'import a lieu quand l'utilisateur importe un nouveau fichier de replay depuis 
 2. Le front envoie le fichier entier au back.
 3. Le back convertit le replay en JSON et stocke les fichiers JSON.
 
-Un match n'est stocké qu'une seule fois. Deux fichiers de replay qui concernent le même match sont considérés comme identiques, car ils ne diffèrent pas fonctionnellement. Quand le match du fichier importé est déjà stocké, le back ne crée pas de nouveau dossier et réutilise celui qui existe. L'utilisateur arrive alors sur l'écran Vue d'ensemble de cette partie, comme pour un nouvel import.
+Un match n'est stocké qu'une seule fois. Deux fichiers de replay qui concernent le même match sont considérés comme identiques, car ils ne diffèrent pas fonctionnellement. Quand le match du fichier importé est déjà stocké, le back ne crée pas de nouveau dossier et réutilise celui qui existe. L'utilisateur arrive alors sur l'écran Vue d'ensemble de cette partie, comme pour un nouvel import. Voir [#31](https://github.com/emocio-tech/RL-Coach/issues/31).
 
 Le dossier est nommé d'après le stade et le mode de jeu, suivis de l'id du replay. Si un dossier de même nom existe déjà pour un autre match, un élément discriminant est ajouté au nom pour ne pas écraser l'existant.
 
 ### Fichier `stats.json`
 Il se compose de deux parties.
 
-**Statistiques globales du match** : informations générales sur la partie, comme le mode de jeu et le score.
+**Statistiques globales du match** : informations générales sur la partie, comme le mode de jeu et le score. Voir [#4](https://github.com/emocio-tech/RL-Coach/issues/4).
 
 **Statistiques par joueur** : pour chaque joueur, on trouve :
 - les statistiques de base : tirs, passes, buts, etc. ;
 - les démolitions : nombre infligé et nombre reçu ;
-- le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir.
+- le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir. Voir [#17](https://github.com/emocio-tech/RL-Coach/issues/17).
 
 ### Fichier `map.json`
-Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
+Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir [#15](https://github.com/emocio-tech/RL-Coach/issues/15).
 
 ## Écrans
 Les écrans de l'application sont décrits dans l'ordre où l'utilisateur les rencontre : la structure commune à tous les écrans, l'écran d'accueil, puis les écrans regroupés par section comme dans la sidebar.
@@ -65,17 +65,17 @@ Les écrans de l'application sont décrits dans l'ordre où l'utilisateur les re
 ### Structure des écrans
 Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
 
-Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
+Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé. Voir [#21](https://github.com/emocio-tech/RL-Coach/issues/21) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
 
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps », « Vue 3D » et « Positionnement ».
+La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps », « Vue 3D » et « Positionnement ». Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
 
 ### Écran d'accueil
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
 
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
-- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie.
+- Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie. Voir [#23](https://github.com/emocio-tech/RL-Coach/issues/23).
 
-Pendant l'import, la zone d'import affiche un loader (cercle animé) et le texte « Analyse en cours… » jusqu'à la fin du traitement. Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+Pendant l'import, la zone d'import affiche un loader (cercle animé) et le texte « Analyse en cours… » jusqu'à la fin du traitement. Voir [#30](https://github.com/emocio-tech/RL-Coach/issues/30). Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
 
 Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
@@ -83,21 +83,25 @@ Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensem
 La section « Statistiques » de la sidebar regroupe les écrans de statistiques de la partie.
 
 #### Écran Vue d'ensemble
-L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sélectionnée, lues depuis ses fichiers JSON. Sa page s'intitule « Vue d'ensemble » et se compose de deux blocs.
+L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sélectionnée, lues depuis ses fichiers JSON. Sa page s'intitule « Vue d'ensemble » et se compose de quatre blocs. Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13), [#3](https://github.com/emocio-tech/RL-Coach/issues/3) et [#4](https://github.com/emocio-tech/RL-Coach/issues/4).
 
-Le premier bloc présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Tant qu'aucun joueur n'est sélectionné dans le menu du header, le bloc se limite à ce résultat. Une fois un joueur sélectionné, le bloc affiche aussi « Tes stats », les statistiques de ce joueur : le modèle de voiture qu'il utilise, affiché sur sa propre ligne, puis son score, ses buts, ses passes décisives, ses arrêts et ses tirs.
+Le premier bloc présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Tant qu'aucun joueur n'est sélectionné dans le menu du header, le bloc se limite à ce résultat. Une fois un joueur sélectionné, le bloc affiche aussi « Tes stats », les statistiques de ce joueur : le modèle de voiture qu'il utilise, affiché sur sa propre ligne, puis son score, ses buts, ses passes décisives, ses arrêts et ses tirs. Voir [#25](https://github.com/emocio-tech/RL-Coach/issues/25).
 
-Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Au sein de chaque tableau, les joueurs sont triés par ordre alphabétique des noms (insensible à la casse et aux accents). Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien.
+Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Au sein de chaque tableau, les joueurs sont triés par ordre alphabétique des noms (insensible à la casse et aux accents). Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien. Voir [#21](https://github.com/emocio-tech/RL-Coach/issues/21) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
+
+Le troisième bloc, « Stats détaillées », présente les statistiques détaillées du joueur sélectionné. Tant qu'aucun joueur n'est sélectionné, il invite à en sélectionner un dans le menu du header. Une fois un joueur sélectionné, le titre du bloc cite son nom et le bloc affiche quatre groupes : « Déplacement », « Positionnement », « Boost » et « Démolitions », avec les statistiques décrites dans « Statistiques détaillées par joueur ». Une statistique indisponible s'affiche sous la forme « — ». Voir [#3](https://github.com/emocio-tech/RL-Coach/issues/3).
+
+Le quatrième bloc, « Style de jeu », affiche le radar décrit dans « Graphiques », sous une phrase qui rappelle que chaque axe est comparé au meilleur des joueurs de la partie (100 %). Ce bloc ne dépend pas du joueur sélectionné dans le header. Voir [#32](https://github.com/emocio-tech/RL-Coach/issues/32).
 
 ### Section Déroulé
 La section « Déroulé » de la sidebar regroupe les écrans qui présentent le déroulé de la partie.
 
 #### Écran Timeline
-L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ».
+L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ». Voir [#9](https://github.com/emocio-tech/RL-Coach/issues/9).
 
 Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, démolition (démolition causée) et détruit (démolition subie). Cliquer sur un type de la légende masque les événements de ce type sur la frise, et un nouveau clic les réaffiche ; un type masqué est grisé et barré dans la légende. Masquer les buts masque aussi leurs barres verticales et les pastilles de score. Tous les types sont affichés à l'arrivée sur l'écran.
 
-La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe (bleue puis orange), triées par ordre alphabétique des noms (insensible à la casse et aux accents) au sein de chaque équipe, et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence.
+La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe (bleue puis orange), triées par ordre alphabétique des noms (insensible à la casse et aux accents) au sein de chaque équipe, et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence. Voir [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
 
 La frise est graduée en temps, de 0:00 à la fin de la partie. Une graduation est affichée à chaque minute entière. La graduation de fin de partie n'est affichée que si elle a assez de place pour ne pas chevaucher la graduation de la dernière minute entière. La frise est graduée avec les temps contenus dans les données du replay, donc depuis le début de l'enregistrement, y compris les compte à rebours et ralentis, et non avec le chrono affiché en jeu (qui peut donc différer de la durée de la partie).
 
@@ -126,7 +130,7 @@ Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de p
 Les positions utilisées proviennent de `map.json`.
 
 #### Écran Vue 3D
-L'écran Vue 3D rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Vue 3D » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir #8.
+L'écran Vue 3D rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Vue 3D » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
 
 Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
 
@@ -142,7 +146,7 @@ Le second bloc, « Frise du match », reprend la frise de l'écran Timeline, ave
 Si la partie n'a pas de données de position, un message l'indique à la place de la rediffusion.
 
 #### Écran Positionnement
-L'écran Positionnement présente l'évolution de la partie sélectionnée au fil du temps. Sa page s'intitule « Positionnement ». Tant qu'aucun joueur n'est sélectionné dans le menu du header, elle contient un seul bloc, « Position de la balle », suivi d'un message qui invite à sélectionner un joueur pour afficher sa position et sa distance à la balle. Une fois un joueur sélectionné, elle contient deux blocs empilés sur toute la largeur : « Position de la balle », qui superpose la position du joueur, et « Distance à la balle ». Les deux graphiques partagent le même axe de temps, gradué à chaque minute entière, et sont alignés. Voir #35.
+L'écran Positionnement présente l'évolution de la partie sélectionnée au fil du temps. Sa page s'intitule « Positionnement ». Tant qu'aucun joueur n'est sélectionné dans le menu du header, elle contient un seul bloc, « Position de la balle », suivi d'un message qui invite à sélectionner un joueur pour afficher sa position et sa distance à la balle. Une fois un joueur sélectionné, elle contient deux blocs empilés sur toute la largeur : « Position de la balle », qui superpose la position du joueur, et « Distance à la balle ». Les deux graphiques partagent le même axe de temps, gradué à chaque minute entière, et sont alignés. Voir [#35](https://github.com/emocio-tech/RL-Coach/issues/35).
 
 Le bloc « Position de la balle » présente la position de la balle au fil de la partie, pour montrer quelle équipe pousse et à quels moments. Une phrase d'introduction l'explique : plus la zone est haute, plus la balle est proche de la cage bleue. Une fois un joueur sélectionné, cette phrase porte aussi sur lui, cite son nom et parle de « la zone ou la ligne pointillée ». Il prend la forme d'un graphique en aires : l'axe horizontal est le temps de la partie, gradué à chaque minute entière, et une ligne médiane représente le milieu du terrain. Quand la balle est dans la moitié de terrain de l'équipe orange, l'aire est orange et en dessous de la ligne médiane. Quand elle est dans la moitié de l'équipe bleue, l'aire est bleue et au-dessus. Plus la balle est proche d'une cage, plus l'aire est haute ou basse. Les libellés « Côté bleu » en haut et « Côté orange » en bas, à gauche du graphique, indiquent la moitié de terrain que représente chaque côté. Sans données de position, le bloc affiche « Pas de données de position pour cette partie. »
 
@@ -158,7 +162,7 @@ Les positions utilisées proviennent de `map.json`.
 Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
 ## Statistiques de la partie
-Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir #3 et #4.
+Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir [#3](https://github.com/emocio-tech/RL-Coach/issues/3) et [#4](https://github.com/emocio-tech/RL-Coach/issues/4).
 
 ### Statistiques du match
 L'application présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Elle présente aussi, par équipe, les statistiques de base de chaque joueur : score, buts, passes décisives, arrêts et tirs.
@@ -174,15 +178,15 @@ Le déplacement et le positionnement sont calculés à partir de `map.json`.
 
 ### Graphiques
 L'application présente trois graphiques :
-- **Position de la balle** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments. Il s'affiche sur l'écran Positionnement, où la position du joueur sélectionné peut lui être superposée. Voir #35.
-- **Distance à la balle** : la distance entre le joueur sélectionné et la balle au fil de la partie. Il s'affiche sur l'écran Positionnement. Voir #35.
-- **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés.
+- **Position de la balle** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments. Il s'affiche sur l'écran Positionnement, où la position du joueur sélectionné peut lui être superposée. Voir [#35](https://github.com/emocio-tech/RL-Coach/issues/35).
+- **Distance à la balle** : la distance entre le joueur sélectionné et la balle au fil de la partie. Il s'affiche sur l'écran Positionnement. Voir [#35](https://github.com/emocio-tech/RL-Coach/issues/35).
+- **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés. Voir [#32](https://github.com/emocio-tech/RL-Coach/issues/32) et [#38](https://github.com/emocio-tech/RL-Coach/issues/38).
   - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms (insensible à la casse et aux accents) au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
   - La légende liste les joueurs par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Elle est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
   - Un bouton « Comparaison » / « Un graphique par joueur » dans l'en-tête du graphique (absent s'il n'y a qu'un joueur) permet d'afficher un petit radar par joueur, bleus puis oranges, avec le nom dans sa couleur et les mêmes maxima. Tous les joueurs y sont affichés, les masquages ne s'appliquent pas. Ils sont conservés au retour sur la comparaison. Changer de partie réinitialise le mode d'affichage et les masquages.
 
 ## Coach IA (chat)
-Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur toutes les pages. Elle ouvre un panneau de discussion avec un coach eSport IA spécialisé dans Rocket League, qui s'adresse à l'utilisateur à la deuxième personne du singulier.
+Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur toutes les pages. Elle ouvre un panneau de discussion avec un coach eSport IA spécialisé dans Rocket League, qui s'adresse à l'utilisateur à la deuxième personne du singulier. Voir [#10](https://github.com/emocio-tech/RL-Coach/issues/10), [#29](https://github.com/emocio-tech/RL-Coach/issues/29) et [#2](https://github.com/emocio-tech/RL-Coach/issues/2).
 
 - La conversation est conservée tant que la page n'est pas rechargée, y compris quand l'utilisateur change de page. Elle n'est pas sauvegardée au-delà.
 - L'utilisateur envoie son message avec le bouton « Envoyer » ou la touche Entrée. L'envoi est impossible si le champ est vide ou si une réponse est en cours. La réponse s'affiche en une fois.
@@ -212,5 +216,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 13 | 2026-10-21 10:41 | TatouGou | issue-8-match-3d-visualization |
 | 14 | 2026-10-21 10:44 | Dimitri FORT | issue-32-game-style-graphics |
 | 15 | 2026-10-21 11:26 | Dimitri FORT | issue-38-sort-header-players |
+| 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
 
 </details>
