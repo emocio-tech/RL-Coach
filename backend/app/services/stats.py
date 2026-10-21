@@ -8,6 +8,7 @@ from app.schemas.replay import (
     BoostStats,
     Demolitions,
     MapFile,
+    MatchEvent,
     PlayerFullStats,
     PlayerMap,
     PlayerStats,
@@ -27,8 +28,16 @@ DEMOLISH_ATTRIBUTES = (
 )
 DEMOLISH_KEYS = ("DemolishExtended", "Demolish")
 MATCH_DEMOLISHES = "TAGame.PRI_TA:MatchDemolishes"
+MATCH_COUNTER_EVENTS = {
+    "TAGame.PRI_TA:MatchGoals": "goal",
+    "TAGame.PRI_TA:MatchAssists": "assist",
+    "TAGame.PRI_TA:MatchSaves": "save",
+    "TAGame.PRI_TA:MatchShots": "shot",
+}
+MAX_EVENTS_PER_UPDATE = 5
 
 PICKUP_UNAVAILABLE = 255
+SHOT_GOAL_DEDUP_WINDOW = 1.0
 BIG_PAD_MIN_RESPAWN = 7.0
 DEMOLISH_DEDUP_WINDOW = 3.0
 
@@ -63,6 +72,8 @@ class _State:
         self.demolish_last = {}
         self.pri_counter = {}
         self.named_counter = {}
+        self.counter_last = {}
+        self.events = []
 
     def add_actor(self, actor_id, name):
         self._forget(actor_id)
@@ -127,6 +138,8 @@ class _State:
             if isinstance(value, int) and not isinstance(value, bool):
                 self.pri_counter[actor_id] = value
                 self._snapshot_counter(actor_id)
+        elif name in MATCH_COUNTER_EVENTS:
+            self._on_match_counter(actor_id, name, attribute)
         if "RigidBody" in attribute and (actor_id in self.cars or actor_id == self.ball):
             body = attribute["RigidBody"] or {}
             location = body.get("location")
@@ -219,6 +232,21 @@ class _State:
         if pad not in self.pad_pending:
             self.pad_pending[pad] = self.now
 
+    def _on_match_counter(self, actor_id, name, attribute):
+        value = attribute.get("Int")
+        if not isinstance(value, int) or isinstance(value, bool):
+            return
+        key = (actor_id, name)
+        previous = self.counter_last.get(key, 0)
+        self.counter_last[key] = value
+        if value <= previous:
+            return
+        player = self.pri_name.get(actor_id)
+        if player is None:
+            return
+        for _ in range(min(value - previous, MAX_EVENTS_PER_UPDATE)):
+            self.events.append((self.now, MATCH_COUNTER_EVENTS[name], player, None))
+
     def _on_demolish(self, attribute):
         data = None
         for key in DEMOLISH_KEYS:
@@ -241,6 +269,7 @@ class _State:
             return
         self.demolish_last[key] = self.now
         self.demolitions.append((attacker, victim))
+        self.events.append((self.now, "demolition", attacker, victim))
 
     def player_sample(self, name):
         for car_id in self.cars:
@@ -460,11 +489,37 @@ def build_match_files(
         z=[r[2] if r else None for r in ball_rows],
     )
 
+    team_by_name = {p.name: p.team for p in stats_list}
+    goal_times = {}
+    for event_time, event_type, event_player, _victim in state.events:
+        if event_type == "goal":
+            goal_times.setdefault(event_player, []).append(event_time)
+    events = []
+    for event_time, event_type, event_player, event_victim in state.events:
+        if event_player not in team_by_name:
+            continue
+        if event_type == "shot" and any(
+            abs(event_time - goal_time) <= SHOT_GOAL_DEDUP_WINDOW
+            for goal_time in goal_times.get(event_player, [])
+        ):
+            continue
+        events.append(
+            MatchEvent(
+                seconds=round(event_time - t0, 1),
+                type=event_type,
+                player=event_player,
+                team=team_by_name[event_player],
+                victim=event_victim,
+            )
+        )
+    events.sort(key=lambda e: e.seconds)
+
     stats_file = StatsFile(
         replay_id=replay_id,
         original_filename=original_filename,
         match=match,
         players=full_players,
+        events=events,
     )
     map_file = MapFile(replay_id=replay_id, players=players, ball=ball)
     return stats_file, map_file

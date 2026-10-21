@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+from app.schemas.replay import StatsFile
 from app.services import stats
 from app.services.parser import ReplayParseError
 from tests.conftest import (
@@ -550,3 +551,254 @@ def test_build_match_files_stats_file_has_no_tracking_data(fake_raw_with_events)
 def test_build_match_files_map_file_has_no_stats_data(fake_raw_with_events):
     keys = set(_all_keys(_map(fake_raw_with_events).model_dump()))
     assert not keys & {"demolitions", "boost_stats", "small_pads", "big_pads", "score", "goals"}
+
+
+# ---------- match events (timeline) ----------
+
+PRI_GOALS = "TAGame.PRI_TA:MatchGoals"
+PRI_ASSISTS = "TAGame.PRI_TA:MatchAssists"
+PRI_SAVES = "TAGame.PRI_TA:MatchSaves"
+PRI_SHOTS = "TAGame.PRI_TA:MatchShots"
+PRI_UNKNOWN, PRI_CAROL = 90, 22  # PRI without any name / PRI named after a player absent from PlayerStats
+
+
+def counter(raw, frame, pri, attribute, value):
+    """PRI counter update {"Int": value}; the attribute name is registered in raw["objects"] if needed."""
+    objects = raw["objects"]
+    if attribute not in objects:
+        objects.append(attribute)
+    add_update(raw, frame, pri, objects.index(attribute), {"Int": value})
+
+
+def _events(raw):
+    return [(e.seconds, e.type, e.player, e.team, e.victim) for e in _stats(raw).events]
+
+
+def _stats_without_events_dict():
+    return {
+        "replay_id": "abc",
+        "original_filename": "old.replay",
+        "match": {},
+        "players": [],
+    }
+
+
+@pytest.mark.parametrize(
+    "attribute, event_type",
+    [(PRI_GOALS, "goal"), (PRI_ASSISTS, "assist"), (PRI_SAVES, "save"), (PRI_SHOTS, "shot")],
+)
+def test_build_match_files_counter_increment_produces_event(fake_raw, attribute, event_type):
+    counter(fake_raw, 30, PRI_A, attribute, 1)
+
+    assert _events(fake_raw) == [(1.0, event_type, "Alice", 0, None)]
+
+
+def test_build_match_files_event_has_team_of_player(fake_raw):
+    counter(fake_raw, 30, PRI_B, PRI_SAVES, 1)
+
+    assert _events(fake_raw) == [(1.0, "save", "Bob", 1, None)]
+
+
+def test_build_match_files_event_seconds_are_relative_to_first_frame(fake_raw):
+    counter(fake_raw, 45, PRI_A, PRI_GOALS, 1)  # frame time is T_OFFSET + 1.5
+
+    assert _events(fake_raw)[0][0] == 1.5
+
+
+def test_build_match_files_event_seconds_rounded_to_one_decimal(fake_raw):
+    counter(fake_raw, 20, PRI_A, PRI_GOALS, 1)  # 0.666... s
+
+    assert _events(fake_raw)[0][0] == 0.7
+
+
+def test_build_match_files_event_after_last_sampled_step_is_kept(fake_raw):
+    late = add_frame(fake_raw, 8.5)
+    counter(fake_raw, late, PRI_A, PRI_GOALS, 1)
+
+    assert _events(fake_raw) == [(8.5, "goal", "Alice", 0, None)]
+
+
+def test_build_match_files_counter_jump_produces_one_event_per_increment(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 3)
+
+    assert _events(fake_raw) == [(1.0, "goal", "Alice", 0, None)] * 3
+
+
+def test_build_match_files_counter_successive_updates_only_count_the_difference(fake_raw):
+    counter(fake_raw, 20, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 40, PRI_A, PRI_GOALS, 3)
+
+    assert [e[0] for e in _events(fake_raw)] == [0.7, 1.3, 1.3]
+
+
+def test_build_match_files_counter_jump_is_capped_per_update(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, stats.MAX_EVENTS_PER_UPDATE + 1)
+    counter(fake_raw, 40, PRI_B, PRI_GOALS, stats.MAX_EVENTS_PER_UPDATE)
+
+    events = _events(fake_raw)
+    assert len([e for e in events if e[2] == "Alice"]) == stats.MAX_EVENTS_PER_UPDATE
+    assert len([e for e in events if e[2] == "Bob"]) == stats.MAX_EVENTS_PER_UPDATE
+
+
+def test_build_match_files_counter_same_value_produces_no_second_event(fake_raw):
+    counter(fake_raw, 20, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 40, PRI_A, PRI_GOALS, 1)
+
+    assert _events(fake_raw) == [(0.7, "goal", "Alice", 0, None)]
+
+
+def test_build_match_files_counter_zero_produces_no_event(fake_raw):
+    counter(fake_raw, 20, PRI_A, PRI_GOALS, 0)
+
+    assert _events(fake_raw) == []
+
+
+def test_build_match_files_counter_decrease_produces_no_event_and_resets_reference(fake_raw):
+    counter(fake_raw, 10, PRI_A, PRI_GOALS, 2)
+    counter(fake_raw, 20, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 2)
+
+    # 2 events at f10, nothing at f20, then +1 relative to the last seen value (1) at f30
+    assert [e[0] for e in _events(fake_raw)] == [0.3, 0.3, 1.0]
+
+
+@pytest.mark.parametrize("value", [True, "2", 1.5, None])
+def test_build_match_files_counter_non_integer_value_is_ignored(fake_raw, value):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, value)
+
+    assert _events(fake_raw) == []
+
+
+def test_build_match_files_counters_are_tracked_per_player_and_per_type(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_B, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_SAVES, 1)
+
+    assert sorted(e[1:3] for e in _events(fake_raw)) == [
+        ("goal", "Alice"), ("goal", "Bob"), ("save", "Alice"),
+    ]
+
+
+def test_build_match_files_counter_of_actor_without_known_name_is_ignored(fake_raw):
+    counter(fake_raw, 30, PRI_UNKNOWN, PRI_GOALS, 1)
+
+    assert _events(fake_raw) == []
+
+
+def test_build_match_files_event_of_player_absent_from_player_stats_is_ignored(fake_raw):
+    add_update(fake_raw, 0, PRI_CAROL, OBJ_PRI_NAME, {"String": "Carol"})
+    counter(fake_raw, 30, PRI_CAROL, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_ASSISTS, 1)
+
+    assert _events(fake_raw) == [(1.0, "assist", "Alice", 0, None)]
+
+
+def test_build_match_files_shot_is_dropped_when_same_player_goal_is_simultaneous(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_SHOTS, 1)
+
+    assert _events(fake_raw) == [(1.0, "goal", "Alice", 0, None)]
+
+
+def test_build_match_files_shot_slightly_before_goal_is_dropped(fake_raw):
+    counter(fake_raw, 24, PRI_A, PRI_SHOTS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+
+    assert [e[1] for e in _events(fake_raw)] == ["goal"]
+
+
+def test_build_match_files_shot_exactly_one_second_from_goal_is_dropped(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 60, PRI_A, PRI_SHOTS, 1)  # 1.0 s later = SHOT_GOAL_DEDUP_WINDOW
+
+    assert [e[1] for e in _events(fake_raw)] == ["goal"]
+
+
+def test_build_match_files_shot_more_than_one_second_from_goal_is_kept(fake_raw):
+    counter(fake_raw, 10, PRI_A, PRI_SHOTS, 1)
+    late = add_frame(fake_raw, 1.5)
+    counter(fake_raw, late, PRI_A, PRI_GOALS, 1)  # 1.5 - 0.33 > 1.0 s
+
+    assert [e[1] for e in _events(fake_raw)] == ["shot", "goal"]
+
+
+def test_build_match_files_shot_is_kept_when_goal_is_by_another_player(fake_raw):
+    counter(fake_raw, 30, PRI_B, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_SHOTS, 1)
+
+    assert sorted(e[1:3] for e in _events(fake_raw)) == [("goal", "Bob"), ("shot", "Alice")]
+
+
+def test_build_match_files_other_event_types_are_not_dropped_near_a_goal(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_ASSISTS, 1)
+    counter(fake_raw, 30, PRI_A, PRI_SAVES, 1)
+
+    assert sorted(e[1] for e in _events(fake_raw)) == ["assist", "goal", "save"]
+
+
+def test_build_match_files_demolition_produces_event_with_victim(fake_raw):
+    demolish(fake_raw, 20, PRI_A, CAR_B)
+
+    assert _events(fake_raw) == [(0.7, "demolition", "Alice", 0, "Bob")]
+
+
+def test_build_match_files_demolition_duplicate_within_window_gives_one_event(fake_raw_with_events):
+    assert _events(fake_raw_with_events) == [(0.7, "demolition", "Alice", 0, "Bob")]
+
+
+def test_build_match_files_demolition_after_dedup_window_gives_second_event(fake_raw):
+    demolish(fake_raw, 0, PRI_A, CAR_B)
+    late = add_frame(fake_raw, 3.0)  # exactly DEMOLISH_DEDUP_WINDOW later
+    demolish(fake_raw, late, PRI_A, CAR_B)
+
+    assert [e[0] for e in _events(fake_raw)] == [0.0, 3.0]
+
+
+def test_build_match_files_self_demolition_produces_no_event(fake_raw):
+    demolish(fake_raw, 20, PRI_A, CAR_A, self_demolish=True)
+
+    assert _events(fake_raw) == []
+
+
+def test_build_match_files_events_are_sorted_chronologically(fake_raw):
+    counter(fake_raw, 50, PRI_B, PRI_SAVES, 1)
+    demolish(fake_raw, 20, PRI_A, CAR_B)
+    counter(fake_raw, 10, PRI_A, PRI_GOALS, 1)
+    late = add_frame(fake_raw, 2.5)
+    counter(fake_raw, late, PRI_A, PRI_ASSISTS, 1)
+
+    events = _events(fake_raw)
+    assert [e[1] for e in events] == ["goal", "demolition", "save", "assist"]
+    assert [e[0] for e in events] == sorted(e[0] for e in events)
+
+
+def test_build_match_files_without_counters_has_no_events(fake_raw):
+    assert _stats(fake_raw).events == []
+
+
+def test_build_match_files_events_do_not_change_player_stats(fake_raw):
+    before = _stats(fake_raw).players
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+
+    assert _stats(fake_raw).players == before
+
+
+def test_stats_file_without_events_key_is_valid():
+    assert StatsFile.model_validate(_stats_without_events_dict()).events == []
+
+
+def test_stats_file_events_roundtrip_through_json(fake_raw):
+    counter(fake_raw, 30, PRI_A, PRI_GOALS, 1)
+    demolish(fake_raw, 20, PRI_A, CAR_B)
+    original = _stats(fake_raw)
+
+    assert StatsFile.model_validate_json(original.model_dump_json()) == original
+
+
+def test_stats_file_rejects_unknown_event_type():
+    data = _stats_without_events_dict()
+    data["events"] = [{"seconds": 1.0, "type": "boost", "player": "Alice", "team": 0}]
+
+    with pytest.raises(ValueError):
+        StatsFile.model_validate(data)

@@ -14,10 +14,10 @@ RL-Coach/
 ├── backend/
 │   ├── app/
 │   │   ├── main.py            # création de l'app FastAPI, CORS, routers
-│   │   ├── config.py          # chemins, taille max d'upload, origines CORS
-│   │   ├── api/routes/        # endpoints HTTP (replays)
-│   │   ├── services/          # storage (fichiers), parser (.replay), stats (calculs)
-│   │   └── schemas/           # modèles Pydantic des réponses
+│   │   ├── config.py          # chemins, taille max d'upload, origines CORS, config LLM (.env)
+│   │   ├── api/routes/        # endpoints HTTP (replays, chat)
+│   │   ├── services/          # storage (fichiers), parser (.replay), stats (calculs), coach (LLM + outils)
+│   │   └── schemas/           # modèles Pydantic (replay, chat)
 │   ├── tests/
 │   └── requirements.txt
 ├── frontend/
@@ -32,6 +32,10 @@ RL-Coach/
 ## Flux
 1. Le front envoie un `.replay` (multipart) à `POST /api/replays`.
 2. Le back extrait les données via rrrocket, puis sauvegarde uniquement `stats.json` et `map.json` dans un dossier de `data/games/` (nom `<stade>_<mode>_<id replay>`, suffixe `_N` en cas de collision) ; le `.replay` n'est jamais conservé.
+
+## Coach IA
+- `POST /api/chat` (`routes/chat.py`, `schemas/chat.py`) : chat stateless, le front renvoie l'historique ; `services/coach.py` appelle le LLM (SDK OpenAI, function calling, 3 outils sans `game_id`, fixé côté serveur).
+- Config via `.env` à la racine (ignoré par Git, modèle : `.env.example`) : `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `LLM_MODEL` (défaut `nova-lite`). Ne jamais committer le `.env`.
 
 ## Commandes
 - Back : `cd backend; python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt; uvicorn app.main:app --reload` (port 8000)
