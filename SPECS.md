@@ -49,7 +49,7 @@ Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensem
 ## Structure des pages
 Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
 
-Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
+Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
 
 La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps » et « Vue 3D ».
 
@@ -58,14 +58,14 @@ L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sél
 
 Le premier bloc présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Tant qu'aucun joueur n'est sélectionné dans le menu du header, le bloc se limite à ce résultat. Une fois un joueur sélectionné, le bloc affiche aussi « Tes stats », les statistiques de ce joueur : le modèle de voiture qu'il utilise, affiché sur sa propre ligne, puis son score, ses buts, ses passes décisives, ses arrêts et ses tirs.
 
-Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien.
+Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Au sein de chaque tableau, les joueurs sont triés par ordre alphabétique des noms (insensible à la casse et aux accents). Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien.
 
 ## Écran Timeline
 L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ».
 
 Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, démolition (démolition causée) et détruit (démolition subie). Cliquer sur un type de la légende masque les événements de ce type sur la frise, et un nouveau clic les réaffiche ; un type masqué est grisé et barré dans la légende. Masquer les buts masque aussi leurs barres verticales et les pastilles de score. Tous les types sont affichés à l'arrivée sur l'écran.
 
-La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe, triées par ordre alphabétique des noms au sein de chaque équipe, et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence.
+La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe (bleue puis orange), triées par ordre alphabétique des noms (insensible à la casse et aux accents) au sein de chaque équipe, et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence.
 
 La frise est graduée en temps, de 0:00 à la fin de la partie. Une graduation est affichée à chaque minute entière. La graduation de fin de partie n'est affichée que si elle a assez de place pour ne pas chevaucher la graduation de la dernière minute entière. La frise est graduée avec les temps contenus dans les données du replay, donc depuis le début de l'enregistrement, y compris les compte à rebours et ralentis, et non avec le chrono affiché en jeu (qui peut donc différer de la durée de la partie).
 
@@ -131,8 +131,8 @@ Le déplacement et le positionnement sont calculés à partir de `map.json`.
 L'application présente deux graphiques :
 - **Momentum** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments.
 - **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés.
-  - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
-  - La légende est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
+  - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms (insensible à la casse et aux accents) au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
+  - La légende liste les joueurs par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Elle est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
   - Un bouton « Comparaison » / « Un graphique par joueur » dans l'en-tête du graphique (absent s'il n'y a qu'un joueur) permet d'afficher un petit radar par joueur, bleus puis oranges, avec le nom dans sa couleur et les mêmes maxima. Tous les joueurs y sont affichés, les masquages ne s'appliquent pas. Ils sont conservés au retour sur la comparaison. Changer de partie réinitialise le mode d'affichage et les masquages.
 
 ## Coach IA (chat)
@@ -165,5 +165,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 12 | 2026-10-21 09:59 | Dimitri FORT | issue-30-replay-upload-loader |
 | 13 | 2026-10-21 10:41 | TatouGou | issue-8-match-3d-visualization |
 | 14 | 2026-10-21 10:44 | Dimitri FORT | issue-32-game-style-graphics |
+| 15 | 2026-10-21 11:26 | Dimitri FORT | issue-38-sort-header-players |
 
 </details>
