@@ -42,7 +42,7 @@ L'écran d'accueil est la première page affichée au démarrage de l'applicatio
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
 - Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie.
 
-Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+Pendant l'import, la zone d'import affiche un loader (cercle animé) et le texte « Analyse en cours… » jusqu'à la fin du traitement. Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
 
 Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
@@ -143,5 +143,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 9 | 2026-10-21 08:51 | Chauvin Matthieu | issue-10-llm-chat-precision |
 | 10 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
 | 11 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
+| 12 | 2026-10-21 09:59 | Dimitri FORT | issue-30-replay-upload-loader |
 
 </details>
