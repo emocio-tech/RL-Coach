@@ -1,5 +1,7 @@
+import json
 import re
 import shutil
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +24,7 @@ from app.services import analysis, parser, stats, maps
 
 CHUNK_SIZE = 1024 * 1024
 GAME_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_STORE_LOCK = threading.Lock()
 
 
 async def save_replay(file: UploadFile) -> UploadResult:
@@ -46,17 +49,51 @@ async def save_replay(file: UploadFile) -> UploadResult:
     raw = await run_in_threadpool(parser.parse_replay, content)
 
     properties = (raw.get("properties") if isinstance(raw, dict) else None) or {}
+    has_id = bool(properties.get("Id"))
     replay_id = str(properties.get("Id") or uuid.uuid4().hex)
     original_filename = re.sub(r"[\x00-\x1f\x7f]", "", Path(name).name)[:255]
 
-    stats_file, map_file = await run_in_threadpool(
-        stats.build_match_files, replay_id, original_filename, raw
-    )
-
     folder_id = await run_in_threadpool(
-        _write_match_folder, _folder_name(properties, replay_id), stats_file, map_file
+        _store_match, raw, properties, replay_id, has_id, original_filename
     )
     return UploadResult(id=folder_id)
+
+
+def _store_match(
+    raw: dict, properties: dict, replay_id: str, has_id: bool, original_filename: str
+) -> str:
+    """Find an existing folder for this replay or write a new one, atomically."""
+    with _STORE_LOCK:
+        if has_id:
+            existing = _find_existing_folder(replay_id)
+            if existing is not None:
+                return existing.name
+        stats_file, map_file = stats.build_match_files(replay_id, original_filename, raw)
+        return _write_match_folder(_folder_name(properties, replay_id), stats_file, map_file)
+
+
+def _find_existing_folder(replay_id: str) -> Path | None:
+    """Folder already holding this replay (same raw replay_id in stats.json), or None."""
+    if not config.GAMES_DIR.is_dir():
+        return None
+    try:
+        folders = sorted(config.GAMES_DIR.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return None
+    for folder in folders:
+        if folder.name.startswith(".tmp-"):
+            continue
+        try:
+            if not folder.is_dir():
+                continue
+            data = json.loads(
+                (folder / config.STATS_FILENAME).read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict) and data.get("replay_id") == replay_id:
+            return folder
+    return None
 
 
 def _sanitize(value, fallback: str) -> str:

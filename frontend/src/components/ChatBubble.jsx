@@ -4,14 +4,16 @@ import remarkGfm from "remark-gfm";
 import { sendChat } from "../api/client.js";
 import { HeatmapChart } from "./Charts.jsx";
 
-const WELCOME_WITH_GAME = "Salut ! Je suis ton coach Rocket League. Réponds à mes deux questions pour que je puisse t'aider.";
+const WELCOME_WITH_GAME = "Salut ! Je suis ton coach Rocket League. En quoi puis-je t'aider pour ce match ?";
+// The question "what do you want to see?" follows as buttons, so the greeting does not ask anything.
+const welcomeForPlayer = (name) => `Salut ${name} ! Je suis ton coach Rocket League.`;
 const WELCOME_WITHOUT_GAME =
   "Salut ! Je suis ton coach Rocket League. Importe un replay pour une analyse chiffrée, ou pose-moi une question sur ton jeu.";
 const QUESTION_PLAYER = "Quel est ton pseudo ?";
 const QUESTION_GOAL = "Que veux-tu voir ?";
 const GOAL_OPTIONS = ["Stats de match", "Axes d'amélioration"];
 
-export default function ChatBubble({ gameId, players, selectedPlayer }) {
+export default function ChatBubble({ hidden = false, gameId, players, selectedPlayer }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -33,16 +35,20 @@ export default function ChatBubble({ gameId, players, selectedPlayer }) {
     setError(null);
   }, [gameId]);
 
-  // Opening the chat on a game with an unknown player: ask the pseudo right away, then the goal.
+  // Another player picked in the statistics page before any message: the questions below must be rebuilt.
   useEffect(() => {
-    if (!open || !gameId || selectedPlayer || chosenPlayer || messages.length > 0 || pending || !players?.length) return;
-    setPending({
-      steps: [
-        { question: QUESTION_PLAYER, options: players },
-        { question: QUESTION_GOAL, options: GOAL_OPTIONS },
-      ],
-      answers: [],
-    });
+    if (messages.length === 0) setPending(null);
+  }, [selectedPlayer]);
+
+  // Opening the chat on a game: ask the goal right away, preceded by the pseudo if the player is unknown.
+  useEffect(() => {
+    if (!open || !gameId || messages.length > 0 || pending) return;
+    const goalStep = { question: QUESTION_GOAL, options: GOAL_OPTIONS };
+    if (selectedPlayer ?? chosenPlayer) {
+      setPending({ steps: [goalStep], answers: [] });
+    } else if (players?.length) {
+      setPending({ steps: [{ question: QUESTION_PLAYER, options: players }, goalStep], answers: [] });
+    }
   }, [open, gameId, selectedPlayer, chosenPlayer, messages.length, pending, players]);
 
   const canSend = draft.trim() !== "" && !loading;
@@ -79,11 +85,18 @@ export default function ChatBubble({ gameId, players, selectedPlayer }) {
       setPending({ ...pending, answers });
       return;
     }
+    if (answers.length === 1) {
+      // The player is already known: only the goal was asked.
+      send(`Je veux voir : ${answers[0].toLowerCase()}.`);
+      return;
+    }
     setChosenPlayer(answers[0]);
     send(`Mon pseudo est « ${answers[0]} ». Je veux voir : ${answers[1].toLowerCase()}.`, answers[0]);
   }
 
   const currentStep = pending ? pending.steps[pending.answers.length] : null;
+  // The player picked in the statistics page, or chosen with the buttons of the chat.
+  const playerName = selectedPlayer ?? chosenPlayer;
 
   function handleKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -91,6 +104,9 @@ export default function ChatBubble({ gameId, players, selectedPlayer }) {
       handleSend();
     }
   }
+
+  // Hidden (e.g. on the home page) but still mounted, so the conversation survives navigation.
+  if (hidden) return null;
 
   return (
     <div className="chat">
@@ -103,7 +119,7 @@ export default function ChatBubble({ gameId, players, selectedPlayer }) {
             </button>
           </div>
           <div className="chat-log" ref={logRef} role="log" aria-live="polite" aria-label="Messages">
-            <p className="chat-message chat-message-assistant">{gameId ? WELCOME_WITH_GAME : WELCOME_WITHOUT_GAME}</p>
+            <p className="chat-message chat-message-assistant">{gameId ? (playerName ? welcomeForPlayer(playerName) : WELCOME_WITH_GAME) : WELCOME_WITHOUT_GAME}</p>
             {messages.map((message, index) =>
               message.role === "assistant" ? (
                 <div key={index} className="chat-message chat-message-assistant chat-markdown">

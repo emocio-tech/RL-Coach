@@ -180,6 +180,20 @@ td.strong { font-weight: 700; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; color: var(--muted-2); }
 .chart-legend span { display: flex; align-items: center; gap: 8px; }
 .radar { max-width: 600px; margin: 0 auto; width: 100%; }
+.radar-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.radar-view-switch { display: flex; flex-wrap: wrap; gap: 8px; }
+.radar-view-switch button { padding: 6px 12px; border: 1px solid var(--panel-edge); border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+@media (hover: hover) { .radar-view-switch button:hover { background: #1b2559; } }
+.radar-view-switch button[aria-pressed="true"] { background: #1b2559; font-weight: 700; }
+.radar-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.radar-item { margin: 0; }
+.radar-item figcaption { margin-bottom: 4px; font-weight: 700; text-align: center; }
+.radar-legend-teams { display: flex; flex-direction: column; gap: 4px; }
+.radar-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; }
+.radar-legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+.radar-legend-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: none; border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@media (hover: hover) { .radar-legend-toggle:hover { background: #1b2559; } }
+.radar-legend-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
 .empty { color: var(--muted); }
 
 /* Timeline */
@@ -338,9 +352,19 @@ td.strong { font-weight: 700; }
   padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
 }
 .chat-choice:hover { background: var(--blue); }
-.heatmap { margin: 8px 0 0; }
-.heatmap figcaption { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-.heatmap svg { display: block; width: 100%; max-width: 240px; border: 2px solid var(--blue-light); border-radius: 8px; }
+/* "Déplacements du joueur" block (Heatmaps mockup), compact version for the chat */
+.heatmap-card {
+  margin: 8px 0 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; color: #fff;
+  background: var(--panel); border: 3px solid var(--panel-edge); border-radius: 18px; box-shadow: 0 5px 0 var(--panel-shadow);
+}
+.heatmap-title { margin: 0; font-size: 14px; text-transform: uppercase; }
+.heatmap-sub { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted-2); }
+.heatmap-card svg { display: block; width: 100%; height: auto; }
+.heatmap-legend {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px;
+  font-size: 11px; font-weight: 500; color: var(--muted);
+}
+.heatmap-scale { display: block; width: 72px; height: 10px; border-radius: 999px; border: 2px solid var(--panel-edge); }
 .chat-markdown { white-space: normal; }
 .chat-markdown > :first-child { margin-top: 0; }
 .chat-markdown > :last-child { margin-bottom: 0; }

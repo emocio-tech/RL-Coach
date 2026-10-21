@@ -77,8 +77,10 @@ export default function App() {
 
   const playerNames = useMemo(() => report?.players.map((p) => p.stats.name), [report]);
 
+  const onHome = page === "home" || !report;
+
   const content =
-    page === "home" || !report ? (
+    onHome ? (
       <Home
         onUploaded={handleUploaded}
         onOpenGame={openGame}
@@ -109,7 +111,7 @@ export default function App() {
   return (
     <>
       {content}
-      <ChatBubble gameId={report?.id} players={playerNames} selectedPlayer={selectedPlayer} />
+      <ChatBubble hidden={onHome} gameId={report?.id} players={playerNames} selectedPlayer={selectedPlayer} />
     </>
   );
 }
