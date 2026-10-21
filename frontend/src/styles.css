@@ -396,3 +396,48 @@ td.strong { font-weight: 700; }
   .chat { right: 12px; bottom: 12px; max-width: calc(100vw - 24px); }
   .chat-panel { width: calc(100vw - 24px); max-height: calc(100vh - 100px); }
 }
+
+/* 3D viewer */
+.viewer-card { padding: 16px; gap: 14px; }
+.viewer-stage { position: relative; width: 100%; height: min(74vh, 780px); min-height: 420px; border-radius: 18px; overflow: hidden; background: #04071a; outline-offset: 4px; }
+.viewer-canvas, .viewer-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.viewer-message { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted-2); font-size: 18px; }
+.viewer-error { color: #ffe2c2; padding: 24px; text-align: center; }
+.viewer-hud { position: absolute; z-index: 2; }
+.viewer-score { top: 14px; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(0,0,0,.5); font-family: var(--font-title); pointer-events: none; }
+.vs-team { min-width: 64px; padding: 8px 16px; font-size: 32px; text-align: center; }
+.vs-blue { background: var(--blue); }
+.vs-orange { background: var(--orange); color: var(--bg); }
+.vs-clock { padding: 8px 18px; background: rgba(10, 16, 48, .88); font-size: 22px; align-self: center; }
+.viewer-modes { top: 14px; right: 14px; display: flex; flex-wrap: wrap; gap: 6px; max-width: 46%; justify-content: flex-end; }
+.chip { border: 2px solid var(--blue-light); background: rgba(10, 16, 48, .78); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 500; backdrop-filter: blur(4px); }
+.chip:hover { background: rgba(27, 37, 89, .95); }
+.chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: var(--bg); font-weight: 700; }
+.chip-main { background: var(--blue-light); color: var(--bg); font-weight: 700; min-width: 96px; }
+.viewer-cards { left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; max-width: 70%; }
+.pcard { --team: var(--blue-light); display: grid; gap: 4px; width: 168px; text-align: left; color: #fff; padding: 8px 12px; border-radius: 14px; border: 2px solid var(--team); background: rgba(10, 16, 48, .8); backdrop-filter: blur(4px); }
+.pcard[aria-pressed="true"] { background: rgba(27, 37, 89, .95); box-shadow: 0 0 0 2px #fff; }
+.pcard-name { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-bar { display: block; height: 8px; border-radius: 4px; background: rgba(255,255,255,.14); overflow: hidden; }
+.pcard-bar i { display: block; height: 100%; background: var(--team); border-radius: 4px; }
+.pcard-speed { font-size: 12px; color: var(--muted); }
+.viewer-goal { --team: var(--orange); position: absolute; z-index: 3; top: 22%; left: 50%; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; padding: 14px 36px; border-radius: 22px; background: rgba(10, 16, 48, .82); border: 4px solid var(--team); box-shadow: 0 0 40px var(--team); pointer-events: none; }
+.viewer-goal strong { font-family: var(--font-title); font-size: 44px; color: var(--team); }
+.viewer-goal span { font-size: 18px; font-weight: 700; }
+.viewer-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; }
+.viewer-time { font-variant-numeric: tabular-nums; color: var(--muted-2); min-width: 92px; }
+.viewer-scrub { position: relative; flex: 1 1 280px; min-width: 200px; }
+.viewer-scrub input[type="range"] { width: 100%; margin: 0; accent-color: var(--orange); }
+.viewer-marks { position: absolute; inset: -10px 8px auto 8px; height: 10px; pointer-events: none; }
+.mark { position: absolute; transform: translateX(-50%); }
+.mark-goal { top: 0; width: 6px; height: 10px; border-radius: 3px; background: var(--team); box-shadow: 0 0 6px var(--team); }
+.mark-demo { top: 3px; width: 4px; height: 4px; border-radius: 50%; background: #ff5252; }
+.viewer-rate { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted-2); }
+.viewer-rate select { background: var(--bg); color: #fff; border: 2px solid var(--blue-light); border-radius: 10px; padding: 4px 8px; font-size: 14px; }
+@media (max-width: 800px) { .viewer-modes { max-width: 70%; top: 70px; } .viewer-cards { max-width: 100%; } }
+
+/* Timeline linked to the 3D viewer */
+.timeline-playhead-layer { z-index: 2; }
+.timeline-playhead { position: absolute; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.9); transform: translateX(-1.5px); }
+.timeline-event-click { cursor: pointer; }
+.timeline-event-click:hover { transform: translateX(-50%) scale(1.25); }

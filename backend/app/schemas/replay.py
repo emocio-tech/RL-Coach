@@ -112,6 +112,22 @@ class MapFile(BaseModel):
     timeline_seconds: float | None = None
 
 
+class PlayerTrackSet(BaseModel):
+    name: str
+    team: int
+    car: str | None = None
+    track: PlayerTrack
+
+
+class MatchTracks(BaseModel):
+    """Everything the 3D viewer needs: the tracks of the players and the ball, without heatmaps."""
+
+    id: str
+    players: list[PlayerTrackSet]
+    ball: BallTrack
+    duration_seconds: float | None = None
+
+
 class PlayerDetail(BaseModel):
     tracked_time_s: float = 0.0
     avg_speed: float | None = None

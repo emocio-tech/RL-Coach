@@ -28,3 +28,7 @@ export function listReplays() {
 export function getReplayStats(id) {
   return request(`/replays/${id}/stats`);
 }
+
+export function getReplayTracks(id) {
+  return request(`/replays/${id}/tracks`);
+}

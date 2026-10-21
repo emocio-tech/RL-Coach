@@ -10,7 +10,16 @@ from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.replay import GameReport, MapFile, PlayerMap, StatsFile, UploadResult, ReplaySummary
+from app.schemas.replay import (
+    GameReport,
+    MapFile,
+    MatchTracks,
+    PlayerMap,
+    PlayerTrackSet,
+    ReplaySummary,
+    StatsFile,
+    UploadResult,
+)
 from app.services import analysis, parser, stats, maps
 
 CHUNK_SIZE = 1024 * 1024
@@ -166,6 +175,33 @@ def list_games() -> list[ReplaySummary]:
             )
         )
     return sorted(games, key=lambda game: game.imported_at, reverse=True)
+
+
+def get_game_tracks(game_id: str) -> MatchTracks | None:
+    """Tracks of every player and of the ball, or None if the game or its map.json is missing."""
+    if not GAME_ID_PATTERN.fullmatch(game_id):
+        return None
+    folder = config.GAMES_DIR / game_id
+    stats_path = folder / config.STATS_FILENAME
+    map_path = folder / config.MAP_FILENAME
+    if not stats_path.is_file() or not map_path.is_file():
+        return None
+    try:
+        stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
+        map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+    except ValueError:
+        # Game imported before the orientations were extracted: no usable tracking data.
+        return None
+    cars = {p.name: p.car for p in stats_file.players}
+    return MatchTracks(
+        id=game_id,
+        players=[
+            PlayerTrackSet(name=p.name, team=p.team, car=cars.get(p.name), track=p.track)
+            for p in map_file.players
+        ],
+        ball=map_file.ball,
+        duration_seconds=stats_file.match.duration_seconds,
+    )
 
 
 def get_game_report(game_id: str) -> GameReport | None:

@@ -175,7 +175,8 @@ function buildTicks(duration) {
   return ticks;
 }
 
-export default function Timeline({ report, selectedPlayer }) {
+// `onSelectEvent(event)` makes the events clickable; `currentTime` draws a playhead (both optional).
+export default function Timeline({ report, selectedPlayer, onSelectEvent, currentTime }) {
   const [hover, setHover] = useState(null);
   const [hiddenTypes, setHiddenTypes] = useState(() => new Set());
   const duration = report.timeline_seconds;
@@ -264,6 +265,14 @@ export default function Timeline({ report, selectedPlayer }) {
                 />
               ))}
             </div>
+            {currentTime != null && (
+              <div aria-hidden="true" className="timeline-overlay timeline-playhead-layer">
+                <span
+                  className="timeline-playhead"
+                  style={{ left: pct(Math.min(Math.max(currentTime, 0), duration), duration) }}
+                />
+              </div>
+            )}
             <div className="timeline-overlay timeline-tip-layer">
               {hovered && hoveredLane >= 0 && (
                 <div
@@ -313,9 +322,10 @@ export default function Timeline({ report, selectedPlayer }) {
                         <button
                           key={eventIndex}
                           type="button"
-                          className="timeline-event"
+                          className={onSelectEvent ? "timeline-event timeline-event-click" : "timeline-event"}
                           style={{ left: pct(event.t, duration), color: TYPES[event.type].color }}
-                          aria-label={`${TYPES[event.type].label} à ${formatClock(event.t)}`}
+                          aria-label={`${TYPES[event.type].label} à ${formatClock(event.t)}${onSelectEvent ? " : voir le replay" : ""}`}
+                          onClick={onSelectEvent ? () => onSelectEvent(event) : undefined}
                           onMouseEnter={() => setHover({ eventIndex })}
                           onMouseLeave={() => setHover(null)}
                           onFocus={() => setHover({ eventIndex })}
