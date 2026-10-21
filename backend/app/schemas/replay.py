@@ -105,11 +105,24 @@ class PlayerMap(BaseModel):
     track: PlayerTrack
 
 
+class PadPickup(BaseModel):
+    t: float
+    back: float | None = None  # when the pad is available again, None if it never is (before the next pickup)
+
+
+class PadTrack(BaseModel):
+    x: float
+    y: float
+    big: bool
+    pickups: list[PadPickup]
+
+
 class MapFile(BaseModel):
     replay_id: str
     players: list[PlayerMap]
     ball: BallTrack
     timeline_seconds: float | None = None
+    pads: list[PadTrack] = []
 
 
 class PlayerTrackSet(BaseModel):
@@ -126,6 +139,7 @@ class MatchTracks(BaseModel):
     players: list[PlayerTrackSet]
     ball: BallTrack
     duration_seconds: float | None = None
+    pads: list[PadTrack] = []
 
 
 class PlayerDetail(BaseModel):

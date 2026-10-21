@@ -77,6 +77,14 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks]);
 
+  // The goals (ball hidden + explosion) are pushed after the engine is created, without rebuilding it.
+  useEffect(() => {
+    engineRef.current?.setGoals(goals.map((g) => ({ t: g.seconds })));
+  }, [goals, tracks]);
+  // The demolitions (car hidden until its respawn + red explosion) are pushed the same way.
+  useEffect(() => {
+    engineRef.current?.setDemolitions(demolitions.map((d) => ({ t: d.seconds, victim: d.victim })));
+  }, [demolitions, tracks]);
   useEffect(() => {
     engineRef.current?.setCamera(mode, target);
   }, [mode, target]);

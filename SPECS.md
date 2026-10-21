@@ -56,7 +56,7 @@ Il se compose de deux parties.
 - le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir. Voir [#17](https://github.com/emocio-tech/RL-Coach/issues/17).
 
 ### Fichier `map.json`
-Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir [#15](https://github.com/emocio-tech/RL-Coach/issues/15).
+Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Il contient aussi l'état des boost pads : pour chaque pad, les instants où un joueur l'a ramassé et ceux où il est redevenu disponible ; un pad dont la position n'a pas pu être déterminée n'y figure pas. Un match déjà stocké n'est pas réécrit à un nouvel import : les parties importées avant l'ajout de ces données n'ont donc pas d'état de pads, et leurs pads restent allumés dans la rediffusion. Les positions des joueurs figurent uniquement dans ce fichier. Voir [#15](https://github.com/emocio-tech/RL-Coach/issues/15).
 
 ## Écrans
 Les écrans de l'application sont décrits dans l'ordre où l'utilisateur les rencontre : la structure commune à tous les écrans, l'écran d'accueil, puis les écrans regroupés par section comme dans la sidebar.
@@ -109,11 +109,11 @@ Les positions utilisées proviennent de `map.json`.
 #### Écran Replay
 L'écran Replay rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Replay » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8) et, pour la frise, [#9](https://github.com/emocio-tech/RL-Coach/issues/9). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
 
-Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
+Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Quand une voiture est démolie, elle disparaît jusqu'à sa réapparition et une explosion rouge, plus petite que celle des buts, se déclenche à l'endroit de la démolition. Le terrain est le même pour toutes les cartes. Quand un joueur ramasse un boost pad, le pad clignote brièvement puis s'éteint. Il se rallume avec un petit flash quand le boost est de nouveau disponible. Quand un but est marqué, la balle disparaît et une explosion aux couleurs de l'équipe qui gagne le point se déclenche à l'endroit du but ; la balle réapparaît quand elle revient en jeu, au coup d'envoi.
 
 Le bloc affiche aussi :
 - le score et le chrono de la rediffusion, calculés à partir des buts, et un bandeau « BUT ! » avec le buteur et le passeur pendant 4 secondes après chaque but ;
-- une carte par joueur (classées par équipe, bleue puis orange, puis par ordre alphabétique des noms) indiquant son niveau de boost et sa vitesse en km/h. Cliquer sur une carte sélectionne le joueur, comme le menu du header, et passe la caméra en cam balle sur ce joueur (y compris si la carte est déjà sélectionnée) ;
+- une carte par joueur (classées par équipe, bleue puis orange, puis par ordre alphabétique des noms) indiquant son niveau de boost et sa vitesse en km/h, ainsi que la mention « démoli » tant que sa voiture est démolie. Cliquer sur une carte sélectionne le joueur, comme le menu du header, et passe la caméra en cam balle sur ce joueur (y compris si la carte est déjà sélectionnée) ;
 - des commandes de lecture : un bouton lecture/pause (icônes triangle et double barre, sans texte ; son libellé accessible est « Pause », « Lecture » ou « Rejouer » une fois la partie terminée), barre de temps avec les buts et les démolitions repérés, et vitesse de lecture de ×0,25 à ×4.
 
 L'utilisateur choisit parmi cinq caméras : libre (à la souris), diffusion, cam balle, poursuite et vue de dessus. Cam balle et poursuite suivent le joueur sélectionné, ou le premier joueur de la liste triée si aucun n'est sélectionné.
@@ -214,5 +214,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 15 | 2026-10-21 11:26 | Dimitri FORT | issue-38-sort-header-players |
 | 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
 | 17 | 2026-10-21 15:00 | iwao | issue-41-3d-view-improvements |
+| 18 | 2026-10-21 16:32 | iwao | issue-41-3d-view-improvements |
 
 </details>

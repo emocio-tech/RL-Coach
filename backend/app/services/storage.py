@@ -201,6 +201,7 @@ def get_game_tracks(game_id: str) -> MatchTracks | None:
         ],
         ball=map_file.ball,
         duration_seconds=stats_file.match.duration_seconds,
+        pads=map_file.pads,
     )
 
 

@@ -9,13 +9,15 @@ from app.schemas.replay import (
     Demolitions,
     MapFile,
     MatchEvent,
+    PadPickup,
+    PadTrack,
     PlayerFullStats,
     PlayerMap,
     PlayerStats,
     PlayerTrack,
     StatsFile,
 )
-from app.services import cars
+from app.services import cars, pads
 from app.services.parser import ReplayParseError
 
 CAR = "Archetypes.Car.Car_Default"
@@ -71,6 +73,8 @@ class _State:
         self.pad_pending = {}
         self.pad_delays = {}
         self.pad_pickups = []
+        self.pad_pickup_events = []
+        self.pad_release_events = []
         self.demolitions = []
         self.demolish_last = {}
         self.pri_counter = {}
@@ -228,6 +232,7 @@ class _State:
         instigator = data.get("instigator")
         picked_up = data.get("picked_up")
         if picked_up == PICKUP_UNAVAILABLE:
+            self.pad_release_events.append((self.now, pad))
             self.pad_last.pop(pad, None)
             if pad in self.pad_pending:
                 started = self.pad_pending.pop(pad)
@@ -243,12 +248,23 @@ class _State:
         if key == self.pad_last.get(pad):
             return
         self.pad_last[pad] = key
+        self.pad_pickup_events.append((self.now, pad, self._car_xy(instigator)))
         player = self.car_player(instigator)
         if player is None:
             return
         self.pad_pickups.append((pad, player))
         if pad not in self.pad_pending:
             self.pad_pending[pad] = self.now
+
+    def _car_xy(self, car_id):
+        rigid = self.rigid.get(car_id)
+        location = rigid[0] if rigid else None
+        if not isinstance(location, dict):
+            return None
+        x, y = location.get("x"), location.get("y")
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (x, y)):
+            return None
+        return (x, y)
 
     def _on_match_counter(self, actor_id, name, attribute):
         value = attribute.get("Int")
@@ -533,6 +549,19 @@ def build_match_files(
         z=[r[2] if r else None for r in ball_rows],
     )
 
+    pad_tracks = [
+        PadTrack(
+            x=pad["x"],
+            y=pad["y"],
+            big=pad["big"],
+            pickups=[PadPickup(**pickup) for pickup in pad["pickups"]],
+        )
+        for pad in pads.locate_pads(
+            [(round(t - t0, 3), pad, xy) for t, pad, xy in state.pad_pickup_events],
+            [(round(t - t0, 3), pad) for t, pad in state.pad_release_events],
+        )
+    ]
+
     team_by_name = {p.name: p.team for p in stats_list}
     goal_times = {}
     for event_time, event_type, event_player, _victim in state.events:
@@ -571,5 +600,6 @@ def build_match_files(
         players=players,
         ball=ball,
         timeline_seconds=timeline_seconds,
+        pads=pad_tracks,
     )
     return stats_file, map_file

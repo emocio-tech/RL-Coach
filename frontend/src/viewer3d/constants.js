@@ -38,7 +38,7 @@ export const HITBOXES = {
   plank: { size: [128.82, 84.67, 29.39], offset: [9.01, 0, 12.09], front: 12.5, rear: 14 },
   breakout: { size: [131.49, 80.52, 30.3], offset: [12.5, 0, 11.75], front: 13.5, rear: 15.5 },
   hybrid: { size: [127.02, 82.19, 34.16], offset: [13.88, 0, 20.75], front: 12.5, rear: 15 },
-  merc: { size: [120.72, 76.81, 41.66], offset: [11.38, 0, 21.51], front: 13.5, rear: 16 },
+  merc: { size: [120.72, 76.71, 41.66], offset: [11.38, 0, 21.51], front: 13.5, rear: 16 },
 };
 
 // Approximate family of a car body, from its in-game name (unknown bodies fall back to the Octane hitbox).

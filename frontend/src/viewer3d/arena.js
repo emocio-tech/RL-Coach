@@ -344,20 +344,25 @@ function buildGoal(side) {
 
 function buildPads() {
   const group = new THREE.Group();
+  const pads = []; // handles used to animate the pads: { x, y, big, materials: [{ material, emissive, opacity }] }
+  const handle = (x, y, big, materials) => ({
+    x, y, big, materials: materials.map((material) => ({ material, emissive: material.emissiveIntensity, opacity: material.opacity, color: material.color.clone() })),
+  });
   const hex = (radius, height) => new THREE.CylinderGeometry(radius, radius, height, 6).rotateX(Math.PI / 2);
   const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2f4a, roughness: 0.6, metalness: 0.4 });
   const glow = new THREE.MeshStandardMaterial({ color: 0xffa02e, emissive: 0xffa02e, emissiveIntensity: 1.3 });
   for (const [x, y] of SMALL_PADS) {
     const base = new THREE.Mesh(hex(78, 3), baseMaterial);
     base.position.set(x, y, 1.5);
-    const core = new THREE.Mesh(hex(58, 4), glow);
+    const core = new THREE.Mesh(hex(58, 4), glow.clone()); // one material per pad: each one is animated on its own
     core.position.set(x, y, 3);
     group.add(base, core);
+    pads.push(handle(x, y, false, [core.material]));
   }
   for (const [x, y] of BIG_PADS) {
     const base = new THREE.Mesh(hex(170, 6), baseMaterial);
     base.position.set(x, y, 3);
-    const core = new THREE.Mesh(hex(130, 8), glow);
+    const core = new THREE.Mesh(hex(130, 8), glow.clone());
     core.position.set(x, y, 6);
     const orb = new THREE.Mesh(
       new THREE.SphereGeometry(62, 24, 16),
@@ -365,8 +370,10 @@ function buildPads() {
     );
     orb.position.set(x, y, 95);
     group.add(base, core, orb);
+    pads.push(handle(x, y, true, [core.material, orb.material]));
   }
-  return group;
+  glow.dispose();
+  return { group, pads };
 }
 
 function buildStands() {
@@ -407,11 +414,13 @@ function buildStands() {
 
 // ---------------------------------------------------------------- public
 
-// Arena in Rocket League coordinates (z up). Add it to a group that converts to three.js axes.
+// Arena in Rocket League coordinates (z up). Add `group` to a group that converts to three.js axes.
+// `pads` are the handles of the boost pads: { x, y, big, materials: [{ material, emissive, opacity }] }.
 export function buildArena() {
   const group = new THREE.Group();
-  group.add(buildFloor(), buildWalls(), buildGoal(-1), buildGoal(1), buildPads(), buildStands());
-  return group;
+  const pads = buildPads();
+  group.add(buildFloor(), buildWalls(), buildGoal(-1), buildGoal(1), pads.group, buildStands());
+  return { group, pads: pads.pads };
 }
 
 // Night sky dome, in three.js coordinates.

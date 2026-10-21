@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { hitboxFor, TEAM_COLORS } from "./constants.js";
 
 // Side silhouette of a car as fractions of its hitbox: [x (-0.5 tail .. 0.5 nose), z (0 bottom .. 1 roof)].
@@ -30,24 +31,58 @@ function extrudeProfile(points, hb, width, bevel) {
   return geometry;
 }
 
-function buildWheel(radius, width) {
+// Materials and geometries shared by all the cars of an engine (created once, disposed with the scene).
+// The paint is NOT in the kit: it is per car (team colour). Wheel geometries depend on the radius and are cached by it.
+export function makeCarKit() {
+  const wheelGeometries = new Map();
+  return {
+    tire: new THREE.MeshStandardMaterial({ color: 0x0b0b10, roughness: 0.92 }),
+    rim: new THREE.MeshStandardMaterial({ color: 0xc9d2e8, metalness: 0.95, roughness: 0.22 }),
+    spokes: new THREE.MeshStandardMaterial({ color: 0x20263a, metalness: 0.8, roughness: 0.35 }),
+    glass: new THREE.MeshStandardMaterial({ color: 0x080d1e, metalness: 0.9, roughness: 0.06 }),
+    dark: new THREE.MeshStandardMaterial({ color: 0x12162a, roughness: 0.55, metalness: 0.5 }),
+    head: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xdde8ff, emissiveIntensity: 3 }),
+    tail: new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 3 }),
+    // { tire, rim, spokes } geometries of a wheel of this radius and width; the 5 spokes are merged into one geometry.
+    wheelGeometry(radius, width) {
+      const key = `${radius}/${width}`;
+      let entry = wheelGeometries.get(key);
+      if (!entry) {
+        const spokes = [];
+        for (let i = 0; i < 5; i++) {
+          spokes.push(new THREE.BoxGeometry(radius * 1.2, width + 1.8, radius * 0.16).rotateY((i * Math.PI * 2) / 5));
+        }
+        entry = {
+          tire: new THREE.CylinderGeometry(radius, radius, width, 24),
+          rim: new THREE.CylinderGeometry(radius * 0.66, radius * 0.66, width + 1.2, 20),
+          spokes: mergeGeometries(spokes),
+        };
+        for (const g of spokes) g.dispose();
+        wheelGeometries.set(key, entry);
+      }
+      return entry;
+    },
+  };
+}
+
+// A wheel is a group of 3 meshes (tire, rim, merged spokes) that rotates around its y axis.
+function buildWheel(kit, radius, width) {
+  const geometry = kit.wheelGeometry(radius, width);
   const wheel = new THREE.Group();
-  const tire = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, width, 24),
-    new THREE.MeshStandardMaterial({ color: 0x0b0b10, roughness: 0.92 })
+  wheel.add(
+    new THREE.Mesh(geometry.tire, kit.tire),
+    new THREE.Mesh(geometry.rim, kit.rim),
+    new THREE.Mesh(geometry.spokes, kit.spokes)
   );
-  const rimMaterial = new THREE.MeshStandardMaterial({ color: 0xc9d2e8, metalness: 0.95, roughness: 0.22 });
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.66, radius * 0.66, width + 1.2, 20), rimMaterial);
-  wheel.add(tire, rim);
-  for (let i = 0; i < 5; i++) {
-    const spoke = new THREE.Mesh(
-      new THREE.BoxGeometry(radius * 1.2, width + 1.8, radius * 0.16),
-      new THREE.MeshStandardMaterial({ color: 0x20263a, metalness: 0.8, roughness: 0.35 })
-    );
-    spoke.rotation.y = (i * Math.PI * 2) / 5;
-    wheel.add(spoke);
-  }
   return wheel;
+}
+
+// Merges static boxes [{ size: [x, y, z], position: [x, y, z] }] into a single mesh (positions baked in the geometry).
+function mergedBoxes(boxes, material) {
+  const geometries = boxes.map(({ size, position }) => new THREE.BoxGeometry(...size).translate(...position));
+  const geometry = mergeGeometries(geometries);
+  for (const g of geometries) g.dispose();
+  return new THREE.Mesh(geometry, material);
 }
 
 function nameSprite(text, color) {
@@ -79,7 +114,8 @@ function nameSprite(text, color) {
 }
 
 // A car in its local frame (x forward, y right, z up), origin = the car origin of the replay.
-export function buildCar({ name, team, carName }) {
+// `kit` comes from makeCarKit(), shared by all the cars.
+export function buildCar({ name, team, carName, kit = makeCarKit() }) {
   const hb = hitboxFor(carName);
   const [length, width, height] = hb.size;
   const [ox, , oz] = hb.offset;
@@ -93,42 +129,37 @@ export function buildCar({ name, team, carName }) {
     clearcoat: 1,
     clearcoatRoughness: 0.08,
   });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x080d1e, metalness: 0.9, roughness: 0.06 });
+  const { glass, dark, head, tail } = kit;
 
   const body = new THREE.Mesh(extrudeProfile(BODY, hb, width, 2.4), paint);
   const cabin = new THREE.Mesh(extrudeProfile(CABIN, hb, width + 1.2, 0.4), glass);
   const roof = new THREE.Mesh(extrudeProfile(ROOF, hb, width - 3, 0.3), paint);
   for (const m of [body, cabin, roof]) m.castShadow = true;
 
-  // Light bars.
+  // Light bars: one merged mesh per material.
   const bottom = oz - height / 2;
-  const head = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xdde8ff, emissiveIntensity: 3 });
-  const tail = new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 3 });
-  const lights = new THREE.Group();
+  const headBoxes = [];
+  const tailBoxes = [];
   for (const sy of [-1, 1]) {
-    const h = new THREE.Mesh(new THREE.BoxGeometry(2.4, width * 0.2, height * 0.1), head);
-    h.position.set(ox + length / 2 + 0.4, sy * width * 0.3, bottom + height * 0.33);
-    const t = new THREE.Mesh(new THREE.BoxGeometry(2.4, width * 0.26, height * 0.08), tail);
-    t.position.set(ox - length / 2 - 0.4, sy * width * 0.28, bottom + height * 0.38);
-    lights.add(h, t);
+    headBoxes.push({ size: [2.4, width * 0.2, height * 0.1], position: [ox + length / 2 + 0.4, sy * width * 0.3, bottom + height * 0.33] });
+    tailBoxes.push({ size: [2.4, width * 0.26, height * 0.08], position: [ox - length / 2 - 0.4, sy * width * 0.28, bottom + height * 0.38] });
   }
+  const lights = new THREE.Group();
+  lights.add(mergedBoxes(headBoxes, head), mergedBoxes(tailBoxes, tail));
 
-  // Bumpers, side skirts and rear wing.
-  const dark = new THREE.MeshStandardMaterial({ color: 0x12162a, roughness: 0.55, metalness: 0.5 });
-  const details = new THREE.Group();
-  const part = (sx, sy, sz, x, y, z, material = dark) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
-    m.position.set(x, y, z);
-    m.castShadow = true;
-    details.add(m);
-  };
+  // Bumpers, side skirts and rear wing: one merged mesh per material (dark, paint).
+  const darkBoxes = [];
+  const paintBoxes = [];
+  const part = (sx, sy, sz, x, y, z, boxes = darkBoxes) => boxes.push({ size: [sx, sy, sz], position: [x, y, z] });
   part(4, width * 0.94, height * 0.15, ox + length / 2 + 0.2, 0, bottom + height * 0.14);
   part(4, width * 0.94, height * 0.15, ox - length / 2 - 0.2, 0, bottom + height * 0.16);
   for (const sy of [-1, 1]) {
     part(length * 0.48, 2.2, height * 0.12, ox, sy * (width / 2 + 0.3), bottom + height * 0.12);
-    part(2, 2, height * 0.16, ox - length / 2 + 6, sy * width * 0.3, bottom + height * 0.56, paint);
+    part(2, 2, height * 0.16, ox - length / 2 + 6, sy * width * 0.3, bottom + height * 0.56, paintBoxes);
   }
-  part(11, width * 0.96, 1.8, ox - length / 2 + 5, 0, bottom + height * 0.66, paint);
+  part(11, width * 0.96, 1.8, ox - length / 2 + 5, 0, bottom + height * 0.66, paintBoxes);
+  const details = new THREE.Group();
+  details.add(mergedBoxes(darkBoxes, dark), mergedBoxes(paintBoxes, paint));
 
   // Wheels.
   const wheels = [];
@@ -139,9 +170,8 @@ export function buildCar({ name, team, carName }) {
   ];
   for (const axle of axles) {
     for (const sy of [-1, 1]) {
-      const wheel = buildWheel(axle.r, wheelWidth);
+      const wheel = buildWheel(kit, axle.r, wheelWidth);
       wheel.position.set(axle.x, sy * (width / 2 - 3.5), axle.r - REST_HEIGHT);
-      wheel.traverse((o) => (o.castShadow = true));
       group.add(wheel);
       wheels.push({ object: wheel, radius: axle.r });
     }
