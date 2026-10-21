@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MomentumChart, StyleRadar } from "../components/Charts.jsx";
+import { StyleRadar } from "../components/Charts.jsx";
 import { TEAM_NAMES } from "../components/Layout.jsx";
 import { sortPlayers } from "../components/playerOrder.js";
 
@@ -248,11 +248,6 @@ export default function OverviewPage({ report, selectedPlayer, onSelectPlayer })
         ) : (
           <p className="card-note">Sélectionne un joueur dans le header pour voir ses stats détaillées.</p>
         )}
-      </section>
-      <section className="card" aria-labelledby="momentum-title">
-        <h2 id="momentum-title" className="title card-title">Momentum</h2>
-        <p className="card-note">Où se trouvait la balle au fil du match : plus la zone est haute, plus l'équipe bleue pousse.</p>
-        <MomentumChart ballY={report.ball_y} sampleSeconds={report.sample_seconds} />
       </section>
       <StyleSection key={report.id} players={players} />
     </>

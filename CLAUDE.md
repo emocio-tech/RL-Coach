@@ -41,6 +41,7 @@ RL-Coach/
 - Back : `cd backend; python -m venv .venv; .venv\Scripts\Activate.ps1; pip install -r requirements.txt; uvicorn app.main:app --reload` (port 8000)
 - Front : `cd frontend; npm install; npm run dev` (port 5173, proxy `/api` vers 8000)
 - Tests back : `cd backend; pytest`
+- Tests front : `cd frontend; npm test`
 
 ## Hooks Git
 - `.githooks/pre-commit` : si un commit modifie `SPECS.md` (hors historique), ajoute une ligne (version, date, auteur, branche) dans l'historique des versions en bas du fichier et la met dans le commit. Ne jamais éditer cet historique à la main ni via `/define-specs`.

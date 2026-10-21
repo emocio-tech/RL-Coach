@@ -200,9 +200,9 @@ td.strong { font-weight: 700; }
 /* z-index 2: stays above .timeline-scroll, whose top padding overlaps the legend and would swallow its clicks. */
 .timeline-legend { position: relative; z-index: 2; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
 .timeline-legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
-.timeline-legend-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: none; border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-@media (hover: hover) { .timeline-legend-toggle:hover { background: #1b2559; } }
-.timeline-legend-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+.timeline-legend-toggle, .chart-legend-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: none; border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@media (hover: hover) { .timeline-legend-toggle:hover, .chart-legend-toggle:hover { background: #1b2559; } }
+.timeline-legend-toggle[aria-pressed="false"], .chart-legend-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
 .timeline-legend-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
 /* Own stacking context (z-index 1) keeps the tooltips below the sticky header (z-index 5). */
 .timeline-scroll { position: relative; z-index: 1; overflow-x: auto; padding-top: 180px; margin-top: -180px; }
@@ -313,6 +313,11 @@ td.strong { font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 .alert { margin: 0; padding: 12px 16px; border-radius: 14px; background: #3a1f08; border: 2px solid var(--orange); color: #ffe2c2; }
 .chart-legend .dot { display: inline-block; }
+.legend-ball { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; background: linear-gradient(180deg, var(--blue) 50%, var(--orange) 50%); }
+.legend-dash { flex: 0 0 auto; width: 28px; height: 0; border-top: 2px dashed #fff; }
+.chart-zoomable { cursor: grab; touch-action: none; user-select: none; }
+.chart-zoomable.dragging { cursor: grabbing; }
+.chart-subtitle { display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--muted-2); }
 
 /* Chat */
 .chat {

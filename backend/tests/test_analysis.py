@@ -1,3 +1,4 @@
+import math
 import json
 
 import pytest
@@ -292,3 +293,114 @@ def test_get_stats_endpoint_legacy_map_json_without_timeline_seconds(client, fil
 
     assert response.status_code == 200
     assert response.json()["timeline_seconds"] is None
+
+
+def test_positioning_series_have_ball_y_length(files):
+    report = analysis.build_report(GAME_ID, *files)
+
+    for player in report.players:
+        assert len(player.detail.y) == len(report.ball_y)
+        assert len(player.detail.ball_distance) == len(report.ball_y)
+
+
+def test_positioning_y_reuses_player_track(files):
+    _, map_file = files
+
+    alice = _detail(analysis.build_report(GAME_ID, *files), "Alice")
+
+    assert alice.y == map_file.players[0].track.y
+
+
+def test_positioning_y_is_none_where_player_is_absent(files):
+    stats_file, map_file = files
+    map_file.players[0].track.y[3] = None
+
+    alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
+
+    assert alice.y[3] is None
+    assert alice.y[2] == -2000.0
+
+
+def test_positioning_y_is_none_where_track_is_shorter_than_ball(files):
+    stats_file, map_file = files
+    track = map_file.players[0].track
+    keep = 7
+    for field in ("t", "x", "y", "z", "speed", "boost", "qx", "qy", "qz", "qw"):
+        setattr(track, field, getattr(track, field)[:keep])
+
+    alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
+
+    assert len(alice.y) == len(map_file.ball.t)
+    assert alice.y[:keep] == [-2000.0] * keep
+    assert alice.y[keep:] == [None] * (len(map_file.ball.t) - keep)
+    assert alice.ball_distance[keep:] == [None] * (len(map_file.ball.t) - keep)
+
+
+def test_positioning_ball_distance_is_none_where_ball_is_unknown(files):
+    stats_file, map_file = files
+    map_file.ball.x[4] = None
+
+    alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
+
+    assert alice.ball_distance[4] is None
+    assert alice.ball_distance[3] is not None
+
+
+def test_positioning_ball_distance_is_none_where_player_is_unknown(files):
+    stats_file, map_file = files
+    map_file.players[0].track.x[2] = None
+
+    report = analysis.build_report(GAME_ID, stats_file, map_file)
+
+    assert _detail(report, "Alice").ball_distance[2] is None
+    assert _detail(report, "Bob").ball_distance[2] is not None
+
+
+def test_positioning_ball_distance_is_rounded_to_one_decimal(files):
+    _, map_file = files
+    track = map_file.players[0].track
+    ball = map_file.ball
+    expected = math.dist((track.x[0], track.y[0], track.z[0]), (ball.x[0], ball.y[0], ball.z[0]))
+
+    alice = _detail(analysis.build_report(GAME_ID, *files), "Alice")
+
+    assert alice.ball_distance[0] == round(expected, 1)
+    assert alice.ball_distance[0] != expected  # the raw distance is not already round
+
+
+def test_positioning_mean_of_ball_distance_matches_avg_ball_distance(files):
+    report = analysis.build_report(GAME_ID, *files)
+
+    for player in report.players:
+        known = [d for d in player.detail.ball_distance if d is not None]
+        assert sum(known) / len(known) == pytest.approx(player.detail.avg_ball_distance, abs=0.1)
+
+
+def test_positioning_series_empty_without_map_file(files):
+    stats_file, _ = files
+
+    detail = analysis.build_report(GAME_ID, stats_file, None).players[0].detail
+
+    assert detail.y == []
+    assert detail.ball_distance == []
+
+
+def test_positioning_series_empty_for_player_without_track(files):
+    stats_file, map_file = files
+    stats_file.players[1].name = "Ghost"
+
+    ghost = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Ghost")
+
+    assert ghost.y == []
+    assert ghost.ball_distance == []
+
+
+def test_get_stats_endpoint_exposes_positioning_series(client, files, games_dir):
+    _write_game(games_dir, files)
+
+    body = client.get(f"/api/replays/{GAME_ID}/stats").json()
+
+    detail = body["players"][0]["detail"]
+    assert detail["y"] == files[1].players[0].track.y
+    assert len(detail["ball_distance"]) == len(body["ball_y"])
+    assert all(isinstance(d, float) for d in detail["ball_distance"])
