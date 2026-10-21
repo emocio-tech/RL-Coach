@@ -335,9 +335,19 @@ td.strong { font-weight: 700; }
   padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
 }
 .chat-choice:hover { background: var(--blue); }
-.heatmap { margin: 8px 0 0; }
-.heatmap figcaption { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-.heatmap svg { display: block; width: 100%; max-width: 240px; border: 2px solid var(--blue-light); border-radius: 8px; }
+/* "Déplacements du joueur" block (Heatmaps mockup), compact version for the chat */
+.heatmap-card {
+  margin: 8px 0 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; color: #fff;
+  background: var(--panel); border: 3px solid var(--panel-edge); border-radius: 18px; box-shadow: 0 5px 0 var(--panel-shadow);
+}
+.heatmap-title { margin: 0; font-size: 14px; text-transform: uppercase; }
+.heatmap-sub { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted-2); }
+.heatmap-card svg { display: block; width: 100%; height: auto; }
+.heatmap-legend {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px;
+  font-size: 11px; font-weight: 500; color: var(--muted);
+}
+.heatmap-scale { display: block; width: 72px; height: 10px; border-radius: 999px; border: 2px solid var(--panel-edge); }
 .chat-markdown { white-space: normal; }
 .chat-markdown > :first-child { margin-top: 0; }
 .chat-markdown > :last-child { margin-bottom: 0; }

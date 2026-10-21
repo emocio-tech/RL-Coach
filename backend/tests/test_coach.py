@@ -8,7 +8,7 @@ import pytest
 from app import config
 from app.schemas.chat import ChatMessage
 from app.schemas.replay import MapFile, MatchEvent
-from app.services import coach, stats, storage
+from app.services import coach, stats, storage, training
 
 GAME_ID = "Stadium_P_Online-1v1_abc"
 
@@ -183,12 +183,12 @@ def test_run_tool_never_raises_on_internal_failure(game, monkeypatch):
     assert result == {"error": "Erreur interne lors de l'exécution de l'outil."}
 
 
-def test_tools_declare_the_six_expected_functions():
+def test_tools_declare_the_seven_expected_functions():
     names = [t["function"]["name"] for t in coach.TOOLS]
 
     assert names == [
         "get_match_summary", "get_player_stats", "compare_players", "choose_player", "show_heatmap",
-        "get_match_events",
+        "get_match_events", "suggest_training",
     ]
 
 
@@ -789,46 +789,65 @@ def _heatmap_call(call_id, player):
     return _tool_call(call_id, "show_heatmap", json.dumps({"player_name": player}))
 
 
+def _zones_line(game, name):
+    """Expected summary line for a player, built from the tool's own result."""
+    zones = json.loads(coach.run_tool("show_heatmap", json.dumps({"player_name": name}), game, []))["zones_pct"]
+    return (
+        f"**{name}** : {zones['defensive']:.0f} % en zone défensive, {zones['mid']:.0f} % au milieu, "
+        f"{zones['offensive']:.0f} % en zone offensive."
+    )
+
+
+def _heatmap_result(player="Alice", **zones):
+    return json.dumps({"displayed": True, "player": player, "zones_pct": zones})
+
+
 def test_chat_show_heatmap_then_text_reply(llm, game):
-    llm([
-        _response(tool_calls=[_heatmap_call("h1", "Alice")]),
-        _response(content="Tu joues surtout en défense."),
+    fake = llm([
+        _response(content="Tu joues surtout en défense.", tool_calls=[_heatmap_call("h1", "Alice")]),
     ])
 
     result = coach.chat(_user("Ma heatmap ?"), game, "Alice")
 
-    assert result.reply == "Tu joues surtout en défense."
+    assert len(fake.calls) == 1
+    assert result.reply == f"Tu joues surtout en défense.\n\nTemps passé par zone :\n\n{_zones_line(game, 'Alice')}"
     assert [h.player for h in result.heatmaps] == ["Alice"]
     assert result.heatmaps[0].heatmap.counts == _stored_counts(game, "Alice")
+    assert result.prompt is None
 
 
-def test_chat_show_heatmap_tool_message_has_zones_but_no_counts(llm, game):
-    fake = llm([
-        _response(tool_calls=[_heatmap_call("h1", "Alice")]),
-        _response(content="ok"),
-    ])
-
-    coach.chat(_user(), game, "Alice")
-
-    tool_msg = fake.calls[1]["messages"][-1]
-    content = json.loads(tool_msg["content"])
-    assert tool_msg["role"] == "tool"
-    assert tool_msg["tool_call_id"] == "h1"
-    assert content["displayed"] is True
-    assert "zones_pct" in content
-    assert "counts" not in tool_msg["content"]
-
-
-def test_chat_show_heatmap_empty_final_reply_uses_default(llm, game):
-    llm([
-        _response(tool_calls=[_heatmap_call("h1", "Alice")]),
-        _response(content=None),
-    ])
+def test_chat_show_heatmap_tool_result_has_zones_but_no_counts(llm, game):
+    fake = llm([_response(tool_calls=[_heatmap_call("h1", "Alice")])])
 
     result = coach.chat(_user(), game, "Alice")
 
-    assert result.reply == coach.DEFAULT_HEATMAP_REPLY
+    raw = coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, [])
+    content = json.loads(raw)
+    assert len(fake.calls) == 1
+    assert content["displayed"] is True
+    assert "zones_pct" in content
+    assert "counts" not in raw
+    # No role "tool" message is ever sent to the model, and the reply does not leak counts.
+    assert all(m["role"] != "tool" for call in fake.calls for m in call["messages"])
+    assert "counts" not in result.reply
+
+
+def test_chat_show_heatmap_without_model_text_starts_with_zone_summary(llm, game):
+    fake = llm([_response(content=None, tool_calls=[_heatmap_call("h1", "Alice")])])
+
+    result = coach.chat(_user(), game, "Alice")
+
+    assert len(fake.calls) == 1
+    assert result.reply == f"Temps passé par zone :\n\n{_zones_line(game, 'Alice')}"
     assert len(result.heatmaps) == 1
+
+
+def test_chat_show_heatmap_empty_string_text_is_treated_as_no_text(llm, game):
+    llm([_response(content="", tool_calls=[_heatmap_call("h1", "Alice")])])
+
+    result = coach.chat(_user(), game, "Alice")
+
+    assert result.reply.startswith("Temps passé par zone :")
 
 
 def test_chat_empty_reply_without_heatmap_still_fails(llm, game):
@@ -842,39 +861,42 @@ def test_chat_empty_reply_without_heatmap_still_fails(llm, game):
 
 
 def test_chat_two_players_in_two_tool_calls(llm, game):
-    llm([
+    fake = llm([
         _response(tool_calls=[_heatmap_call("h1", "Alice"), _heatmap_call("h2", "Bob")]),
-        _response(content="Comparaison."),
     ])
 
     result = coach.chat(_user(), game, "Alice")
 
+    assert len(fake.calls) == 1
     assert [h.player for h in result.heatmaps] == ["Alice", "Bob"]
     assert [h.team for h in result.heatmaps] == [0, 1]
+    assert result.reply == f"Temps passé par zone :\n\n{_zones_line(game, 'Alice')}\n\n{_zones_line(game, 'Bob')}"
 
 
-def test_chat_same_player_requested_twice_gives_one_heatmap(llm, game):
-    llm([
-        _response(tool_calls=[_heatmap_call("h1", "Alice")]),
+def test_chat_same_player_requested_twice_across_iterations_gives_one_heatmap(llm, game):
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Alice"), _tool_call("s1", "get_match_summary")]),
         _response(tool_calls=[_heatmap_call("h2", "alice")]),
-        _response(content="Voilà."),
     ])
 
     result = coach.chat(_user(), game, "Alice")
 
+    assert len(fake.calls) == 2
     assert [h.player for h in result.heatmaps] == ["Alice"]
 
 
-def test_chat_heatmaps_not_shared_between_turns(llm, game):
-    llm([
+def test_chat_heatmaps_not_shared_between_calls(llm, game):
+    fake = llm([
         _response(tool_calls=[_heatmap_call("h1", "Alice")]),
-        _response(content="Premier."),
         _response(content="Second."),
     ])
 
-    coach.chat(_user(), game, "Alice")
+    first = coach.chat(_user(), game, "Alice")
     second = coach.chat(_user(), game, "Alice")
 
+    assert len(fake.calls) == 2  # one per chat(): the shortcut did not consume an extra response
+    assert [h.player for h in first.heatmaps] == ["Alice"]
+    assert second.reply == "Second."
     assert second.heatmaps == []
 
 
@@ -887,21 +909,192 @@ def test_chat_heatmap_error_for_missing_map_is_sent_to_model(llm, game):
 
     result = coach.chat(_user(), game, "Alice")
 
+    assert len(fake.calls) == 2
     assert result.heatmaps == []
     assert result.reply == "Pas de carte disponible."
     assert json.loads(fake.calls[1]["messages"][-1]["content"]) == {"error": "Heatmap indisponible pour ce joueur."}
 
 
-def test_chat_choose_player_reply_carries_collected_heatmaps(llm, game):
-    llm([
-        _response(tool_calls=[_heatmap_call("h1", "Alice")]),
+def test_chat_show_heatmap_unknown_player_has_no_shortcut(llm, game):
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Zed")]),
+        _response(content="Je ne connais pas Zed."),
+    ])
+
+    result = coach.chat(_user(), game, "Alice")
+
+    assert len(fake.calls) == 2
+    assert result.reply == "Je ne connais pas Zed."
+    assert result.heatmaps == []
+    tool_msg = fake.calls[1]["messages"][-1]
+    assert tool_msg["role"] == "tool"
+    assert tool_msg["tool_call_id"] == "h1"
+    assert json.loads(tool_msg["content"])["error"] == "Joueur introuvable."
+
+
+def test_chat_show_heatmap_one_valid_one_unknown_player_has_no_shortcut(llm, game):
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Alice"), _heatmap_call("h2", "Zed")]),
+        _response(content="Alice affichée, Zed inconnu."),
+    ])
+
+    result = coach.chat(_user(), game, "Alice")
+
+    assert len(fake.calls) == 2
+    assert result.reply == "Alice affichée, Zed inconnu."
+    assert [h.player for h in result.heatmaps] == ["Alice"]
+    assert [m["tool_call_id"] for m in fake.calls[1]["messages"] if m["role"] == "tool"] == ["h1", "h2"]
+
+
+def test_chat_show_heatmap_with_other_tool_in_same_turn_has_no_shortcut(llm, game):
+    stats_call = _tool_call("p1", "get_player_stats", '{"player_name": "Alice"}')
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Alice"), stats_call]),
+        _response(content="Voici tes stats et ta carte."),
+    ])
+
+    result = coach.chat(_user(), game, "Alice")
+
+    assert len(fake.calls) == 2
+    assert result.reply == "Voici tes stats et ta carte."
+    assert [h.player for h in result.heatmaps] == ["Alice"]
+
+
+def test_chat_show_heatmap_uses_selected_player_through_shortcut(llm, game):
+    fake = llm([_response(tool_calls=[_tool_call("h1", "show_heatmap", "{}")])])
+
+    result = coach.chat(_user(), game, "Bob")
+
+    assert len(fake.calls) == 1
+    assert [h.player for h in result.heatmaps] == ["Bob"]
+    assert result.reply == f"Temps passé par zone :\n\n{_zones_line(game, 'Bob')}"
+
+
+def test_chat_choose_player_reply_carries_heatmaps_collected_in_earlier_iteration(llm, game):
+    # show_heatmap + another tool: no shortcut, the heatmap is collected and the model is called again.
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Alice"), _tool_call("s1", "get_match_summary")]),
         _response(tool_calls=[_tool_call("c1", "choose_player")]),
     ])
 
     result = coach.chat(_user(), game, None)
 
+    assert len(fake.calls) == 2
     assert result.prompt is not None
+    assert result.reply == coach.DEFAULT_CHOICE_REPLY
     assert [h.player for h in result.heatmaps] == ["Alice"]
+
+
+def test_chat_choose_player_and_show_heatmap_in_same_turn_runs_no_tool(llm, game):
+    # choose_player ends the turn before any tool of that turn runs: no shortcut, no heatmap produced.
+    fake = llm([
+        _response(tool_calls=[_heatmap_call("h1", "Alice"), _tool_call("c1", "choose_player")]),
+    ])
+
+    result = coach.chat(_user(), game, None)
+
+    assert len(fake.calls) == 1
+    assert result.prompt is not None
+    assert result.heatmaps == []
+
+
+# ---------- _heatmap_reply ----------
+
+
+def test_heatmap_reply_rounds_percentages_to_integer():
+    raw = _heatmap_result(defensive=54.6, mid=20.4, offensive=25.0)
+
+    reply = coach._heatmap_reply(None, [raw])
+
+    assert reply == (
+        "Temps passé par zone :\n\n"
+        "**Alice** : 55 % en zone défensive, 20 % au milieu, 25 % en zone offensive."
+    )
+
+
+def test_heatmap_reply_keeps_model_text_before_summary():
+    raw = _heatmap_result(defensive=50, mid=30, offensive=20)
+
+    reply = coach._heatmap_reply("Regarde ça.", [raw])
+
+    assert reply == (
+        "Regarde ça.\n\nTemps passé par zone :\n\n"
+        "**Alice** : 50 % en zone défensive, 30 % au milieu, 20 % en zone offensive."
+    )
+
+
+def test_heatmap_reply_omits_none_zones():
+    raw = _heatmap_result(defensive=None, mid=40, offensive=None)
+
+    assert coach._heatmap_reply(None, [raw]) == "Temps passé par zone :\n\n**Alice** : 40 % au milieu."
+
+
+def test_heatmap_reply_keeps_zero_percent_zone():
+    raw = _heatmap_result(defensive=0, mid=60, offensive=40)
+
+    assert "0 % en zone défensive" in coach._heatmap_reply(None, [raw])
+
+
+def test_heatmap_reply_omits_player_line_when_all_zones_none():
+    raws = [
+        _heatmap_result("Alice", defensive=None, mid=None, offensive=None),
+        _heatmap_result("Bob", defensive=10, mid=10, offensive=80),
+    ]
+
+    reply = coach._heatmap_reply(None, raws)
+
+    assert reply == (
+        "Temps passé par zone :\n\n**Bob** : 10 % en zone défensive, 10 % au milieu, 80 % en zone offensive."
+    )
+
+
+def test_heatmap_reply_all_zones_none_without_text_uses_default():
+    raw = _heatmap_result(defensive=None, mid=None, offensive=None)
+
+    assert coach._heatmap_reply(None, [raw]) == coach.DEFAULT_HEATMAP_REPLY
+
+
+def test_heatmap_reply_missing_or_null_zones_pct_without_text_uses_default():
+    no_zones = json.dumps({"displayed": True, "player": "Alice"})
+    null_zones = json.dumps({"displayed": True, "player": "Alice", "zones_pct": None})
+
+    assert coach._heatmap_reply(None, [no_zones, null_zones]) == coach.DEFAULT_HEATMAP_REPLY
+
+
+def test_heatmap_reply_all_zones_none_keeps_model_text_only():
+    raw = _heatmap_result(defensive=None, mid=None, offensive=None)
+
+    assert coach._heatmap_reply("Voilà.", [raw]) == "Voilà."
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        json.dumps({"error": "Joueur introuvable."}),
+        json.dumps({"displayed": False, "player": "Alice", "zones_pct": {"mid": 50}}),
+    ],
+)
+def test_heatmap_reply_returns_none_when_not_displayed(raw):
+    assert coach._heatmap_reply("Texte", [raw]) is None
+
+
+def test_heatmap_reply_returns_none_if_any_result_failed():
+    ok = _heatmap_result("Alice", defensive=10, mid=10, offensive=80)
+    ko = json.dumps({"error": "Heatmap indisponible pour ce joueur."})
+
+    assert coach._heatmap_reply(None, [ok, ko]) is None
+    assert coach._heatmap_reply(None, [ko, ok]) is None
+
+
+def test_heatmap_reply_players_in_given_order():
+    raws = [
+        _heatmap_result("Bob", defensive=1, mid=2, offensive=3),
+        _heatmap_result("Alice", defensive=4, mid=5, offensive=6),
+    ]
+
+    reply = coach._heatmap_reply(None, raws)
+
+    assert reply.index("**Bob**") < reply.index("**Alice**")
 
 
 # ---------- get_match_events ----------
@@ -951,18 +1144,27 @@ def test_get_match_events_tool_arguments_are_optional_and_type_is_enum():
 
     assert "required" not in parameters
     assert set(parameters["properties"]) == {"player_name", "event_type"}
-    assert parameters["properties"]["event_type"]["enum"] == ["goal", "assist", "shot", "save", "demolition"]
+    assert parameters["properties"]["event_type"]["enum"] == [
+        "goal", "assist", "shot", "save", "demo_done", "demo_taken"
+    ]
 
 
 def test_run_tool_get_match_events_all_events(events_game):
     result = _events_result(events_game)
 
     assert result["events"] == [
-        {"time": "00:05", "type": "tir", "player": "Alice", "team": 0},
-        {"time": "00:10", "type": "passe décisive", "player": "Bob", "team": 1},
-        {"time": "01:23", "type": "but", "player": "Alice", "team": 0},
-        {"time": "01:40", "type": "démolition", "player": "Alice", "team": 0, "victim": "Bob"},
-        {"time": "62:05", "type": "arrêt", "player": "Bob", "team": 1},
+        {"time": "00:05", "type": "tir", "player": "Alice", "team": 0, "score": "0-0"},
+        {"time": "00:10", "type": "passe décisive", "player": "Bob", "team": 1, "score": "0-0"},
+        {"time": "01:23", "type": "but", "player": "Alice", "team": 0, "score": "1-0"},
+        {
+            "time": "01:40", "type": "démolition infligée", "player": "Alice", "team": 0,
+            "score": "1-0", "victim": "Bob",
+        },
+        {
+            "time": "01:40", "type": "démolition subie", "player": "Bob", "team": 1,
+            "score": "1-0", "attacker": "Alice",
+        },
+        {"time": "62:05", "type": "arrêt", "player": "Bob", "team": 1, "score": "1-0"},
     ]
     assert result["note"] == coach.EVENTS_TIME_NOTE
     assert "truncated" not in result
@@ -971,7 +1173,7 @@ def test_run_tool_get_match_events_all_events(events_game):
 def test_run_tool_get_match_events_without_arguments_string(events_game):
     result = json.loads(coach.run_tool("get_match_events", None, events_game))
 
-    assert len(result["events"]) == 5
+    assert len(result["events"]) == 6
 
 
 @pytest.mark.parametrize(
@@ -987,7 +1189,7 @@ def test_run_tool_get_match_events_time_format(write_events, seconds, expected):
 def test_run_tool_get_match_events_filter_by_player(events_game):
     result = _events_result(events_game, player_name="Bob")
 
-    assert [e["type"] for e in result["events"]] == ["passe décisive", "arrêt"]
+    assert [e["type"] for e in result["events"]] == ["passe décisive", "démolition subie", "arrêt"]
     assert {e["player"] for e in result["events"]} == {"Bob"}
 
 
@@ -995,27 +1197,30 @@ def test_run_tool_get_match_events_player_filter_is_case_and_space_insensitive(e
     result = _events_result(events_game, player_name="  aLiCe ")
 
     assert {e["player"] for e in result["events"]} == {"Alice"}
-    assert len(result["events"]) == 3
+    assert len(result["events"]) == 3  # shot, goal, demolition done
 
 
-def test_run_tool_get_match_events_player_filter_ignores_victims(events_game):
-    # Bob is the victim of a demolition but only the attacker owns the event
+def test_run_tool_get_match_events_player_filter_includes_demolitions_taken(events_game):
     result = _events_result(events_game, player_name="Bob")
 
-    assert "démolition" not in [e["type"] for e in result["events"]]
+    assert "démolition subie" in [e["type"] for e in result["events"]]
+    assert "démolition infligée" not in [e["type"] for e in result["events"]]
 
 
 def test_run_tool_get_match_events_filter_by_type(events_game):
     result = _events_result(events_game, event_type="goal")
 
-    assert result["events"] == [{"time": "01:23", "type": "but", "player": "Alice", "team": 0}]
+    assert result["events"] == [{"time": "01:23", "type": "but", "player": "Alice", "team": 0, "score": "1-0"}]
 
 
 def test_run_tool_get_match_events_combined_filters(events_game):
-    result = _events_result(events_game, player_name="Alice", event_type="demolition")
+    result = _events_result(events_game, player_name="Alice", event_type="demo_done")
 
     assert result["events"] == [
-        {"time": "01:40", "type": "démolition", "player": "Alice", "team": 0, "victim": "Bob"}
+        {
+            "time": "01:40", "type": "démolition infligée", "player": "Alice", "team": 0,
+            "score": "1-0", "victim": "Bob",
+        }
     ]
 
 
@@ -1028,7 +1233,7 @@ def test_run_tool_get_match_events_filters_without_match_return_empty_list_witho
 def test_run_tool_get_match_events_null_filters_mean_no_filter(events_game):
     result = _events_result(events_game, player_name=None, event_type=None)
 
-    assert len(result["events"]) == 5
+    assert len(result["events"]) == 6
 
 
 def test_run_tool_get_match_events_unknown_player(events_game):
@@ -1044,13 +1249,13 @@ def test_run_tool_get_match_events_player_name_empty_or_invalid_type(events_game
     assert result == {"error": "Argument player_name manquant ou invalide."}
 
 
-@pytest.mark.parametrize("event_type", ["boost", "", "GOAL", "but", 3, ["goal"]])
+@pytest.mark.parametrize("event_type", ["boost", "", "GOAL", "but", "demolition", 3, ["goal"]])
 def test_run_tool_get_match_events_invalid_event_type(events_game, event_type):
     result = _events_result(events_game, event_type=event_type)
 
     assert result == {
         "error": "Argument event_type invalide.",
-        "allowed": ["goal", "assist", "shot", "save", "demolition"],
+        "allowed": ["goal", "assist", "shot", "save", "demo_done", "demo_taken"],
     }
 
 
@@ -1083,10 +1288,44 @@ def test_run_tool_get_match_events_unknown_player_checked_before_unavailable_not
     assert _events_result(game_id, player_name="Zorro")["error"] == "Joueur introuvable."
 
 
-def test_run_tool_get_match_events_victim_only_for_demolitions(events_game):
+def test_run_tool_get_match_events_victim_only_for_demolitions_done(events_game):
     events = _events_result(events_game)["events"]
 
-    assert [e["type"] for e in events if "victim" in e] == ["démolition"]
+    assert [e["type"] for e in events if "victim" in e] == ["démolition infligée"]
+    assert [e["type"] for e in events if "attacker" in e] == ["démolition subie"]
+
+
+def test_run_tool_get_match_events_links_goal_and_assist(write_events):
+    game_id = write_events([
+        _event(50.0, "goal", "Alice", 0),
+        _event(49.8, "assist", "Carol", 0),
+        _event(90.0, "goal", "Bob", 1),
+    ])
+
+    events = _events_result(game_id)["events"]
+
+    assert events[0] == {
+        "time": "00:49", "type": "passe décisive", "player": "Carol", "team": 0,
+        "score": "0-0", "goal_by": "Alice",
+    }
+    assert events[1] == {
+        "time": "00:50", "type": "but", "player": "Alice", "team": 0, "score": "1-0", "assist_by": "Carol",
+    }
+    assert events[2]["score"] == "1-1"
+    assert "assist_by" not in events[2]
+
+
+def test_run_tool_get_match_events_assist_outside_window_or_same_player_is_not_linked(write_events):
+    game_id = write_events([
+        _event(50.0, "goal", "Alice", 0),
+        _event(50.6, "assist", "Carol", 0),
+        _event(70.0, "goal", "Bob", 1),
+        _event(70.1, "assist", "Bob", 1),
+    ])
+
+    events = _events_result(game_id)["events"]
+
+    assert not any("assist_by" in e or "goal_by" in e for e in events)
 
 
 def test_run_tool_get_match_events_raw_seconds_never_exposed(events_game):
@@ -1168,7 +1407,7 @@ def test_chat_get_match_events_then_reply(llm, events_game):
     assert tool_msg["role"] == "tool"
     assert tool_msg["tool_call_id"] == "call_1"
     content = json.loads(tool_msg["content"])
-    assert content["events"] == [{"time": "01:23", "type": "but", "player": "Alice", "team": 0}]
+    assert content["events"] == [{"time": "01:23", "type": "but", "player": "Alice", "team": 0, "score": "1-0"}]
     assert "83.7" not in tool_msg["content"]
 
 
@@ -1188,3 +1427,205 @@ def test_build_system_prompt_mentions_get_match_events_with_game():
 
 def test_build_system_prompt_no_get_match_events_without_game():
     assert "get_match_events" not in coach.build_system_prompt(None, None)
+
+
+# ---------- selected player (dropdown of the statistics page) is the default player ----------
+
+
+def test_run_tool_get_player_stats_defaults_to_selected_player(game):
+    result = json.loads(coach.run_tool("get_player_stats", "{}", game, selected_player="Alice"))
+
+    assert result["name"] == "Alice"
+
+
+def test_run_tool_explicit_player_name_overrides_selected_player(game):
+    result = json.loads(coach.run_tool("get_player_stats", '{"player_name": "Bob"}', game, selected_player="Alice"))
+
+    assert result["name"] == "Bob"
+
+
+def test_run_tool_show_heatmap_defaults_to_selected_player(game):
+    heatmaps = []
+
+    result = json.loads(coach.run_tool("show_heatmap", "{}", game, heatmaps, selected_player="Bob"))
+
+    assert result["player"] == "Bob"
+    assert [h.player for h in heatmaps] == ["Bob"]
+
+
+def test_run_tool_without_player_name_and_selected_player_still_errors(game):
+    result = json.loads(coach.run_tool("get_player_stats", "{}", game))
+
+    assert result == {"error": "Argument player_name manquant ou invalide."}
+
+
+def test_run_tool_invalid_player_name_type_does_not_fall_back_to_selected_player(game):
+    result = json.loads(coach.run_tool("get_player_stats", '{"player_name": 42}', game, selected_player="Alice"))
+
+    assert result == {"error": "Argument player_name manquant ou invalide."}
+
+
+def test_chat_passes_selected_player_to_tools(llm, game):
+    fake = llm([_response(tool_calls=[_tool_call("c1", "get_player_stats", "{}")]), _response(content="Ok")])
+
+    coach.chat(_user(), game, "Alice")
+
+    tool_message = next(m for m in fake.calls[1]["messages"] if m["role"] == "tool")
+    assert json.loads(tool_message["content"])["name"] == "Alice"
+
+
+def test_build_system_prompt_says_selected_player_is_the_user():
+    prompt = coach.build_system_prompt(GAME_ID, "Alice")
+
+    assert '"Alice"' in prompt
+    assert "liste déroulante" in prompt
+    assert "Ne lui redemande pas son pseudo" in prompt
+
+
+# ---------- suggest_training ----------
+
+TRAINING_QUESTION = "Veux-tu que je te propose des entraînements pour améliorer ces points ?"
+
+
+def _training_args(*areas):
+    return json.dumps({"focus_areas": list(areas)})
+
+
+def test_suggest_training_tool_declaration():
+    tool = next(t for t in coach.TOOLS if t["function"]["name"] == "suggest_training")
+    parameters = tool["function"]["parameters"]
+    focus = parameters["properties"]["focus_areas"]
+
+    assert parameters["required"] == ["focus_areas"]
+    assert focus["type"] == "array"
+    assert focus["items"]["enum"] == list(training.FOCUS_AREAS)
+    assert focus["minItems"] == 1
+    assert focus["maxItems"] == 3
+
+
+def test_run_tool_suggest_training_nominal(game):
+    result = json.loads(coach.run_tool("suggest_training", _training_args("boost", "aerials"), game))
+
+    assert [t["focus"] for t in result["trainings"]] == [training.FOCUS_AREAS["boost"], training.FOCUS_AREAS["aerials"]]
+    assert result["trainings"][0]["drills"]
+    assert result["total_minutes"] == sum(d["minutes"] for t in result["trainings"] for d in t["drills"])
+
+
+def test_run_tool_suggest_training_without_game_id():
+    result = json.loads(coach.run_tool("suggest_training", _training_args("speed"), None))
+
+    assert "error" not in result
+    assert result["trainings"][0]["focus"] == training.FOCUS_AREAS["speed"]
+
+
+def test_run_tool_suggest_training_with_empty_game_id():
+    result = json.loads(coach.run_tool("suggest_training", _training_args("speed"), ""))
+
+    assert "error" not in result
+
+
+def test_run_tool_suggest_training_with_missing_game(games_dir):
+    result = json.loads(coach.run_tool("suggest_training", _training_args("defense"), "Missing_Game_1"))
+
+    assert "error" not in result
+    assert result["trainings"][0]["focus"] == training.FOCUS_AREAS["defense"]
+
+
+def test_run_tool_suggest_training_does_not_read_the_game(monkeypatch):
+    def boom(_):
+        raise AssertionError("storage must not be read")
+
+    monkeypatch.setattr(coach.storage, "get_game_report", boom)
+
+    result = json.loads(coach.run_tool("suggest_training", _training_args("shooting"), "Any_Game_1"))
+
+    assert "error" not in result
+
+
+@pytest.mark.parametrize("game_id", [None, GAME_ID])
+def test_run_tool_suggest_training_invalid_json(game_id):
+    result = json.loads(coach.run_tool("suggest_training", "{not json", game_id))
+
+    assert result == {"error": "Arguments invalides : JSON incorrect."}
+
+
+@pytest.mark.parametrize("arguments", ["[]", '"boost"', "42", "null"])
+def test_run_tool_suggest_training_non_object_arguments(arguments):
+    result = json.loads(coach.run_tool("suggest_training", arguments, None))
+
+    assert result == {"error": "Arguments invalides : un objet JSON est attendu."}
+
+
+@pytest.mark.parametrize("arguments", [None, "", "{}", '{"focus_areas": null}', '{"focus_areas": []}'])
+def test_run_tool_suggest_training_focus_areas_missing(arguments):
+    result = json.loads(coach.run_tool("suggest_training", arguments, None))
+
+    assert result == {"error": "Argument focus_areas manquant ou invalide.", "allowed": list(training.FOCUS_AREAS)}
+
+
+def test_run_tool_suggest_training_unknown_area():
+    result = json.loads(coach.run_tool("suggest_training", _training_args("boost", "cooking"), None))
+
+    assert result == {"error": "Axe d'entraînement inconnu.", "allowed": list(training.FOCUS_AREAS)}
+
+
+def test_run_tool_suggest_training_caps_at_three_areas():
+    result = json.loads(
+        coach.run_tool("suggest_training", _training_args("boost", "speed", "aerials", "defense"), None)
+    )
+
+    assert len(result["trainings"]) == 3
+    assert result["ignored_focus_areas"] == ["defense"]
+
+
+@pytest.mark.parametrize("selected_player", [None, "Alice"])
+def test_build_system_prompt_with_game_asks_training_question_and_mentions_tool(selected_player):
+    prompt = coach.build_system_prompt(GAME_ID, selected_player)
+
+    assert TRAINING_QUESTION in prompt
+    assert "suggest_training" in prompt
+
+
+def test_build_system_prompt_without_game_does_not_mention_suggest_training():
+    prompt = coach.build_system_prompt(None, None)
+
+    assert "suggest_training" not in prompt
+    assert TRAINING_QUESTION not in prompt
+
+
+def test_chat_suggest_training_then_reply(llm, game):
+    fake = llm([
+        _response(tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost", "positioning"))]),
+        _response(content="Voici ton plan."),
+    ])
+
+    reply = coach.chat(_user("Oui, propose-moi des exercices"), game, "Alice")
+
+    assert reply.reply == "Voici ton plan."
+    assert len(fake.calls) == 2
+    tool_msg = fake.calls[1]["messages"][-1]
+    assert tool_msg["role"] == "tool"
+    assert tool_msg["tool_call_id"] == "t1"
+    content = json.loads(tool_msg["content"])
+    assert [t["focus"] for t in content["trainings"]] == [
+        training.FOCUS_AREAS["boost"], training.FOCUS_AREAS["positioning"]
+    ]
+    assert content["trainings"][0]["drills"][0]["name"] == training.CATALOG["boost"][1][0][0]
+
+
+def test_chat_suggest_training_is_ignored_without_game_id(llm):
+    fake = llm([_response(content="Réponse", tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost"))])])
+
+    result = coach.chat(_user(), None, None)
+
+    assert result == coach.CoachReply(reply="Réponse", prompt=None)
+    assert len(fake.calls) == 1
+    assert all(m["role"] != "tool" for m in fake.calls[0]["messages"])
+
+
+def test_heatmap_reply_same_player_twice_gives_one_line():
+    result = json.dumps({"displayed": True, "player": "Alice", "zones_pct": {"defensive": 60, "mid": 30, "offensive": 10}})
+
+    reply = coach._heatmap_reply(None, [result, result])
+
+    assert reply == "Temps passé par zone :\n\n**Alice** : 60 % en zone défensive, 30 % au milieu, 10 % en zone offensive."
