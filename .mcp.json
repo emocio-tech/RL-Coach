@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "rl-coach": {
+      "command": "cmd",
+      "args": ["/c", "cd backend && .venv\\Scripts\\python.exe -m app.mcp_server"]
+    }
+  }
+}

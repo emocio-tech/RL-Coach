@@ -21,11 +21,12 @@
   - [Statistiques détaillées par joueur](#statistiques-détaillées-par-joueur)
   - [Graphiques](#graphiques)
 - [Coach IA (chat)](#coach-ia-chat)
+- [Serveur MCP](#serveur-mcp)
 
 ## Présentation générale
 RL-Coach est une application web d'analyse de statistiques Rocket League, à partir de fichiers de replay fournis par l'utilisateur.
 
-L'application a un front en React avec TypeScript et un back en Python avec FastAPI. Le front communique avec le back via l'API HTTP exposée par ce dernier.
+L'application a un front en React avec TypeScript et un back en Python avec FastAPI. Le front communique avec le back via l'API HTTP exposée par ce dernier. Les parties importées sont aussi accessibles à des agents externes via un serveur MCP.
 
 ## Identité visuelle
 L'interface est colorée et ludique. Elle reprend les couleurs de Rocket League, le bleu et l'orange, qui représentent aussi les deux équipes d'une partie. La typographie est de style « fun », en cohérence avec l'univers du jeu. Voir [#13](https://github.com/emocio-tech/RL-Coach/issues/13).
@@ -192,6 +193,21 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 - Le coach refuse les sujets sans rapport avec Rocket League.
 - En cas de problème (coach non configuré, indisponible ou trop lent), un message d'erreur en français s'affiche dans le panneau.
 
+## Serveur MCP
+Un serveur MCP donne à n'importe quel agent compatible (Claude Code, GitHub Copilot, Cursor, Claude Desktop…) un accès aux parties déjà importées dans RL-Coach. Il fonctionne sans le back FastAPI, sans clé d'API et sans appeler de LLM. Les données fournies sont brutes : c'est l'agent qui rédige les conseils. Voir [#12](https://github.com/emocio-tech/RL-Coach/issues/12).
+
+Par exemple, l'utilisateur demande à son agent ce qu'il doit améliorer sur sa dernière partie. L'agent retrouve la partie, lit les statistiques du joueur, puis répond avec des conseils chiffrés. S'il le souhaite, l'utilisateur obtient aussi des exercices d'entraînement.
+
+L'agent peut :
+- lister les parties importées, la plus récente d'abord ;
+- lire le résumé d'une partie : score, durée, mode, carte et statistiques de base des joueurs ;
+- lire les statistiques détaillées d'un joueur, ou comparer tous les joueurs ;
+- retrouver les événements horodatés d'une partie (buts, passes décisives, tirs, arrêts, démolitions infligées et subies), pour tous les joueurs ou pour un seul ;
+- obtenir le temps passé par un joueur en zone défensive, milieu et offensive ;
+- obtenir des entraînements pour un à trois axes de progression : boost, positionnement, rotation, défense, tir, vitesse, aériens, contrôle de balle.
+
+Le serveur est en lecture seule : il n'importe ni ne supprime de partie. Il n'offre pas de chat, car l'agent fait lui-même le coaching. Il se lance à la demande de l'agent.
+
 <details>
 <summary>Historique des versions</summary>
 
@@ -213,8 +229,7 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 14 | 2026-10-21 10:44 | Dimitri FORT | issue-32-game-style-graphics |
 | 15 | 2026-10-21 11:26 | Dimitri FORT | issue-38-sort-header-players |
 | 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
-| 17 | 2026-10-21 15:00 | iwao | issue-41-3d-view-improvements |
-| 18 | 2026-10-21 16:32 | iwao | issue-41-3d-view-improvements |
-| 19 | 2026-10-21 16:40 | iwao | issue-41-3d-view-improvements |
+| 17 | 2026-10-21 16:40 | iwao | issue-41-3d-view-improvements |
+| 18 | 2026-10-21 16:42 | TatouGou | issue-12-create-mcp-server |
 
 </details>
