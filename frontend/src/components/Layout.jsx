@@ -69,6 +69,7 @@ const NAV_ICONS = {
   home: <><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></>,
   overview: <><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></>,
   timeline: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  match3d: <><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
   positioning: <><path d="M3 17l5-6 4 3 5-8 4 5" /><path d="M3 21h18" /></>,
 };
 
