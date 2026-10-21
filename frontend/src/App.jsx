@@ -91,7 +91,7 @@ export default function App() {
         selectedPlayer={selectedPlayer}
         onSelectPlayer={setSelectedPlayer}
       >
-        <OverviewPage report={report} selectedPlayer={selectedPlayer} />
+        <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
       </Layout>
     );
 
@@ -100,14 +100,5 @@ export default function App() {
       {content}
       <ChatBubble gameId={report?.id} players={playerNames} selectedPlayer={selectedPlayer} />
     </>
-    <Layout
-      page={page}
-      onNavigate={setPage}
-      players={report.players.map((p) => p.stats)}
-      selectedPlayer={selectedPlayer}
-      onSelectPlayer={setSelectedPlayer}
-    >
-      <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
-    </Layout>
   );
 }
