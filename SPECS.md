@@ -63,13 +63,13 @@ Le second bloc présente les statistiques de tous les joueurs de la partie dans 
 ## Écran Timeline
 L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ».
 
-Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, Kill (démolition causée) et Mort (démolition subie).
+Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, démolition (démolition causée) et détruit (démolition subie). Cliquer sur un type de la légende masque les événements de ce type sur la frise, et un nouveau clic les réaffiche ; un type masqué est grisé et barré dans la légende. Masquer les buts masque aussi leurs barres verticales et les pastilles de score. Tous les types sont affichés à l'arrivée sur l'écran.
 
-La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence.
+La frise a une bande horizontale par joueur de la partie, avec le nom du joueur à gauche. Les bandes sont regroupées par équipe, triées par ordre alphabétique des noms au sein de chaque équipe, et teintées de la couleur de leur équipe. Si un joueur est sélectionné dans le menu du header, sa bande est mise en évidence.
 
-La frise est graduée en temps, de 0:00 à la fin de la partie. Une graduation est affichée à chaque minute entière. La graduation de fin de partie n'est affichée que si elle a assez de place pour ne pas chevaucher la graduation de la dernière minute entière.
+La frise est graduée en temps, de 0:00 à la fin de la partie. Une graduation est affichée à chaque minute entière. La graduation de fin de partie n'est affichée que si elle a assez de place pour ne pas chevaucher la graduation de la dernière minute entière. La frise est graduée avec les temps contenus dans les données du replay, donc depuis le début de l'enregistrement, y compris les compte à rebours et ralentis, et non avec le chrono affiché en jeu (qui peut donc différer de la durée de la partie).
 
-Sur la bande de chaque joueur, une icône est placée à l'instant de chacun de ses événements : ses buts, ses passes décisives, ses tirs, ses arrêts, les démolitions qu'il cause (Kill) et celles qu'il subit (Mort). Toutes les icônes d'une bande sont sur une même ligne. Un tir qui marque est affiché comme un but, pas comme un tir.
+Sur la bande de chaque joueur, une icône est placée à l'instant de chacun de ses événements : ses buts, ses passes décisives, ses tirs, ses arrêts, les démolitions qu'il cause (icône « Démolition ») et celles qu'il subit (icône « Détruit »). Toutes les icônes d'une bande sont sur une même ligne. Un tir qui marque est affiché comme un but, pas comme un tir.
 
 Chaque but est aussi marqué par une barre verticale en pointillés, de la couleur de l'équipe qui a marqué, qui traverse toutes les bandes. Sous la frise, alignée avec cette barre, une pastille affiche le score de la partie après ce but.
 
@@ -79,8 +79,8 @@ Quand l'utilisateur survole une icône, un tooltip s'affiche au-dessus d'elle. I
 - Passe décisive : le passeur, le joueur qui a marqué sur cette passe et le score après le but.
 - Tir : le tireur et le score à ce moment.
 - Arrêt : le joueur qui a fait l'arrêt et le score à ce moment.
-- Kill : le joueur qui a démoli et sa victime.
-- Mort : le joueur démoli et celui qui l'a démoli.
+- Démolition : le joueur qui a démoli et sa victime.
+- Détruit : le joueur démoli et celui qui l'a démoli.
 
 ## Écran Heatmaps
 L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».

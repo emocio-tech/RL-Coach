@@ -5,6 +5,7 @@ import Layout from "./components/Layout.jsx";
 import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
 import OverviewPage from "./pages/OverviewPage.jsx";
+import TimelinePage from "./pages/TimelinePage.jsx";
 
 function Home({ onUploaded, onOpenGame, error, hasReport, onOpenReport }) {
   return (
@@ -91,7 +92,11 @@ export default function App() {
         selectedPlayer={selectedPlayer}
         onSelectPlayer={setSelectedPlayer}
       >
-        <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
+        {page === "timeline" ? (
+          <TimelinePage report={report} selectedPlayer={selectedPlayer} />
+        ) : (
+          <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
+        )}
       </Layout>
     );
 

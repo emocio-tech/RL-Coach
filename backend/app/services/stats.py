@@ -557,6 +557,7 @@ def build_match_files(
             )
         )
     events.sort(key=lambda e: e.seconds)
+    timeline_seconds = round(max([last_rel, *(e.seconds for e in events)]), 2)
 
     stats_file = StatsFile(
         replay_id=replay_id,
@@ -565,5 +566,10 @@ def build_match_files(
         players=full_players,
         events=events,
     )
-    map_file = MapFile(replay_id=replay_id, players=players, ball=ball)
+    map_file = MapFile(
+        replay_id=replay_id,
+        players=players,
+        ball=ball,
+        timeline_seconds=timeline_seconds,
+    )
     return stats_file, map_file

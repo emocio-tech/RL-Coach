@@ -80,5 +80,5 @@ Le momentum et le radar sont dessinés par le front (`frontend/src/components/Ch
 
 ### Périmètre et limites
 - Les stats détaillées sont calculées à chaque appel, à partir de `stats.json` et `map.json`. Rien n'est stocké en plus.
-- Pas de modèle de voiture, ni d'événements datés (buts, tirs, démolitions avec auteur et victime) : la Timeline n'est pas couverte.
+- Pas de modèle de voiture. Les événements datés (buts, tirs, démolitions…) sont décrits dans `docs/timeline-events.md`.
 - Pas de route pour lister les parties déjà importées.

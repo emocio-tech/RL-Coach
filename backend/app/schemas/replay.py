@@ -109,6 +109,7 @@ class MapFile(BaseModel):
     replay_id: str
     players: list[PlayerMap]
     ball: BallTrack
+    timeline_seconds: float | None = None
 
 
 class PlayerDetail(BaseModel):
@@ -140,3 +141,4 @@ class GameReport(BaseModel):
     ball_y: list[float | None] = []
     sample_seconds: float | None = None
     events: list[MatchEvent] = []
+    timeline_seconds: float | None = None

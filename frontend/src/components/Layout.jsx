@@ -94,7 +94,7 @@ export default function Layout({ page, onNavigate, players, selectedPlayer, onSe
           </div>
           <div className="nav-group" role="group" aria-labelledby="nav-flow">
             <span id="nav-flow" className="nav-title">Déroulé</span>
-            <NavLink id="timeline" page={page} onNavigate={onNavigate} disabled>Timeline</NavLink>
+            <NavLink id="timeline" page={page} onNavigate={onNavigate}>Timeline</NavLink>
           </div>
         </nav>
         <main className="content">{children}</main>

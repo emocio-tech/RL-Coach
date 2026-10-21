@@ -182,6 +182,64 @@ td.strong { font-weight: 700; }
 .radar { max-width: 600px; margin: 0 auto; width: 100%; }
 .empty { color: var(--muted); }
 
+/* Timeline */
+/* z-index 2: stays above .timeline-scroll, whose top padding overlaps the legend and would swallow its clicks. */
+.timeline-legend { position: relative; z-index: 2; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.timeline-legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
+.timeline-legend-toggle { display: flex; align-items: center; gap: 8px; padding: 4px 8px; border: none; border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@media (hover: hover) { .timeline-legend-toggle:hover { background: #1b2559; } }
+.timeline-legend-toggle[aria-pressed="false"] { opacity: 0.45; text-decoration: line-through; }
+.timeline-legend-icon { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; }
+/* Own stacking context (z-index 1) keeps the tooltips below the sticky header (z-index 5). */
+.timeline-scroll { position: relative; z-index: 1; overflow-x: auto; padding-top: 180px; margin-top: -180px; }
+/* While a tooltip is shown, the scroll area goes above the legend (z-index 2) so the card covers it; still below the header. */
+.timeline-scroll:has(.timeline-tip) { z-index: 3; }
+.timeline-inner { min-width: 900px; display: flex; flex-direction: column; gap: 8px; }
+.timeline-axis-row { display: flex; align-items: flex-end; }
+.timeline-axis-spacer { flex: 0 0 153px; }
+.timeline-axis { flex: 1 1 auto; position: relative; height: 28px; margin: 0 43px 0 16px; }
+.timeline-tick { position: absolute; bottom: 0; transform: translateX(-50%); font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.timeline-lanes { position: relative; display: flex; flex-direction: column; gap: 8px; }
+.timeline-overlay { position: absolute; top: 0; bottom: 0; left: 169px; right: 43px; pointer-events: none; }
+.timeline-goal-bars { z-index: 0; }
+.timeline-tip-layer { z-index: 30; }
+.timeline-goal-bar { position: absolute; top: 0; bottom: 0; border-left: 2px dashed; transform: translateX(-1px); }
+.timeline-tip-pos { position: absolute; }
+.timeline-lane { display: flex; align-items: stretch; border: 3px solid; border-radius: 16px; overflow: hidden; }
+.timeline-lane-label { flex: 0 0 150px; display: flex; align-items: center; padding: 0 16px; border-right: 3px solid; }
+.timeline-lane-name { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
+.timeline-dot { flex: 0 0 auto; display: inline-block; border-radius: 50%; }
+.timeline-track { flex: 1 1 auto; position: relative; z-index: 1; height: 36px; margin: 0 40px 0 16px; }
+.timeline-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(201, 211, 255, 0.18); }
+.timeline-event {
+  position: absolute; top: 8px; transform: translateX(-50%);
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; padding: 0; border: none; background: transparent;
+}
+.timeline-score-row { display: flex; align-items: flex-start; }
+.timeline-score-label { flex: 0 0 153px; padding-right: 12px; text-align: right; font-size: 13px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 28px; }
+.timeline-score-pill {
+  position: absolute; top: 0; transform: translateX(-50%);
+  height: 28px; display: flex; align-items: center; padding: 0 12px; border-radius: 999px;
+  background: var(--bg); border: 2px solid; font-family: var(--font-title); font-size: 14px; white-space: nowrap;
+}
+.timeline-blue { color: var(--blue-soft); }
+.timeline-orange { color: #ffa24d; }
+.timeline-sep { color: var(--muted-2); }
+.timeline-tip { position: relative; width: 240px; padding-bottom: 8px; color: var(--text); }
+.timeline-tip-box { width: 240px; background: var(--bar); border: 2px solid; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 0 rgba(0, 0, 0, 0.3); }
+.timeline-tip-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 2px solid; }
+.timeline-tip-label { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.timeline-tip-time { margin-left: auto; font-family: var(--font-title); font-size: 14px; color: var(--text); }
+.timeline-tip-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.timeline-tip-who { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; }
+.timeline-tip-verb { font-size: 12px; font-weight: 500; color: var(--muted); }
+.timeline-tip-other { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--bg); border-radius: 12px; padding: 8px 12px; font-size: 13px; }
+.timeline-tip-other span { color: var(--muted); }
+.timeline-tip-other strong { display: flex; align-items: center; gap: 6px; }
+.timeline-tip-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.timeline-tip-row > span { color: var(--muted); }
+
 /* Home */
 .home { min-height: 100vh; padding: 32px 16px; display: flex; flex-direction: column; align-items: center; gap: 48px; }
 .home > * { width: 100%; max-width: 1100px; }
