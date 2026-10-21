@@ -6,6 +6,7 @@ import { sortPlayers } from "./components/playerOrder.js";
 import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
 import OverviewPage from "./pages/OverviewPage.jsx";
+import PositioningPage from "./pages/PositioningPage.jsx";
 import TimelinePage from "./pages/TimelinePage.jsx";
 
 const Match3DPage = lazy(() => import("./pages/Match3DPage.jsx"));
@@ -107,6 +108,8 @@ export default function App() {
           </Suspense>
         ) : page === "timeline" ? (
           <TimelinePage report={report} selectedPlayer={selectedPlayer} />
+        ) : page === "positioning" ? (
+          <PositioningPage report={report} selectedPlayer={selectedPlayer} />
         ) : (
           <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
         )}

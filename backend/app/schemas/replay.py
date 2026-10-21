@@ -142,6 +142,8 @@ class PlayerDetail(BaseModel):
     first_man_pct: float | None = None
     second_man_pct: float | None = None
     third_man_pct: float | None = None
+    y: list[float | None] = []
+    ball_distance: list[float | None] = []
 
 
 class PlayerReport(BaseModel):

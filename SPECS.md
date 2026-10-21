@@ -1,5 +1,28 @@
 # Specs RL-Coach
 
+## Table des matières
+- [Présentation générale](#présentation-générale)
+- [Identité visuelle](#identité-visuelle)
+- [Import et stockage des replays](#import-et-stockage-des-replays)
+  - [Fichier `stats.json`](#fichier-statsjson)
+  - [Fichier `map.json`](#fichier-mapjson)
+- [Écrans](#écrans)
+  - [Structure des écrans](#structure-des-écrans)
+  - [Écran d'accueil](#écran-daccueil)
+  - [Section Statistiques](#section-statistiques)
+    - [Écran Vue d'ensemble](#écran-vue-densemble)
+  - [Section Déroulé](#section-déroulé)
+    - [Écran Timeline](#écran-timeline)
+    - [Écran Heatmaps](#écran-heatmaps)
+    - [Écran Vue 3D](#écran-vue-3d)
+    - [Écran Positionnement](#écran-positionnement)
+- [Maquettes](#maquettes)
+- [Statistiques de la partie](#statistiques-de-la-partie)
+  - [Statistiques du match](#statistiques-du-match)
+  - [Statistiques détaillées par joueur](#statistiques-détaillées-par-joueur)
+  - [Graphiques](#graphiques)
+- [Coach IA (chat)](#coach-ia-chat)
+
 ## Présentation générale
 RL-Coach est une application web d'analyse de statistiques Rocket League, à partir de fichiers de replay fournis par l'utilisateur.
 
@@ -36,7 +59,17 @@ Il se compose de deux parties.
 ### Fichier `map.json`
 Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Les positions des joueurs figurent uniquement dans ce fichier. Voir #15.
 
-## Écran d'accueil
+## Écrans
+Les écrans de l'application sont décrits dans l'ordre où l'utilisateur les rencontre : la structure commune à tous les écrans, l'écran d'accueil, puis les écrans regroupés par section comme dans la sidebar.
+
+### Structure des écrans
+Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
+
+Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
+
+La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. Chaque lien est précédé d'une icône. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps », « Vue 3D » et « Positionnement ».
+
+### Écran d'accueil
 L'écran d'accueil est la première page affichée au démarrage de l'application. L'utilisateur y a deux possibilités :
 
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
@@ -46,21 +79,20 @@ Pendant l'import, la zone d'import affiche un loader (cercle animé) et le texte
 
 Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
-## Structure des pages
-Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structure : un header en haut, une sidebar à gauche et la zone de contenu de la page.
+### Section Statistiques
+La section « Statistiques » de la sidebar regroupe les écrans de statistiques de la partie.
 
-Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte, listés par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
-
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps » et « Vue 3D ».
-
-## Écran Vue d'ensemble
+#### Écran Vue d'ensemble
 L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sélectionnée, lues depuis ses fichiers JSON. Sa page s'intitule « Vue d'ensemble » et se compose de deux blocs.
 
 Le premier bloc présente le résultat de la partie : score final des équipes bleue et orange, durée, mode de jeu, carte et vainqueur. Tant qu'aucun joueur n'est sélectionné dans le menu du header, le bloc se limite à ce résultat. Une fois un joueur sélectionné, le bloc affiche aussi « Tes stats », les statistiques de ce joueur : le modèle de voiture qu'il utilise, affiché sur sa propre ligne, puis son score, ses buts, ses passes décisives, ses arrêts et ses tirs.
 
 Le second bloc présente les statistiques de tous les joueurs de la partie dans un tableau par équipe : modèle de voiture, score, buts, passes décisives, arrêts et tirs. Au sein de chaque tableau, les joueurs sont triés par ordre alphabétique des noms (insensible à la casse et aux accents). Les deux tableaux ont les mêmes colonnes, alignées et de même largeur. La ligne du joueur sélectionné est mise en évidence. Cliquer sur une ligne de ces tableaux sélectionne le joueur correspondant, comme le menu du header ; cliquer sur la ligne du joueur déjà sélectionné ne change rien.
 
-## Écran Timeline
+### Section Déroulé
+La section « Déroulé » de la sidebar regroupe les écrans qui présentent le déroulé de la partie.
+
+#### Écran Timeline
 L'écran Timeline présente le déroulé de la partie sélectionnée sous la forme d'une frise chronologique. Sa page s'intitule « Timeline » et contient un seul bloc, « Frise du match ».
 
 Le bloc affiche d'abord une légende qui liste les types d'événements, chacun avec son icône et sa couleur : but, passe décisive, tir, arrêt, démolition (démolition causée) et détruit (démolition subie). Cliquer sur un type de la légende masque les événements de ce type sur la frise, et un nouveau clic les réaffiche ; un type masqué est grisé et barré dans la légende. Masquer les buts masque aussi leurs barres verticales et les pastilles de score. Tous les types sont affichés à l'arrivée sur l'écran.
@@ -82,7 +114,7 @@ Quand l'utilisateur survole une icône, un tooltip s'affiche au-dessus d'elle. I
 - Démolition : le joueur qui a démoli et sa victime.
 - Détruit : le joueur démoli et celui qui l'a démoli.
 
-## Écran Heatmaps
+#### Écran Heatmaps
 L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».
 
 Tant qu'aucun joueur n'est sélectionné dans le menu du header, la page contient un seul bloc, « Déplacements du ballon ». Une fois un joueur sélectionné, elle contient deux blocs côte à côte : « Déplacements du joueur », à gauche, et « Déplacements du ballon », à droite.
@@ -93,7 +125,7 @@ Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de p
 
 Les positions utilisées proviennent de `map.json`.
 
-## Écran Vue 3D
+#### Écran Vue 3D
 L'écran Vue 3D rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Vue 3D » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir #8.
 
 Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
@@ -109,8 +141,21 @@ Le second bloc, « Frise du match », reprend la frise de l'écran Timeline, ave
 
 Si la partie n'a pas de données de position, un message l'indique à la place de la rediffusion.
 
+#### Écran Positionnement
+L'écran Positionnement présente l'évolution de la partie sélectionnée au fil du temps. Sa page s'intitule « Positionnement ». Tant qu'aucun joueur n'est sélectionné dans le menu du header, elle contient un seul bloc, « Position de la balle », suivi d'un message qui invite à sélectionner un joueur pour afficher sa position et sa distance à la balle. Une fois un joueur sélectionné, elle contient deux blocs empilés sur toute la largeur : « Position de la balle », qui superpose la position du joueur, et « Distance à la balle ». Les deux graphiques partagent le même axe de temps, gradué à chaque minute entière, et sont alignés. Voir #35.
+
+Le bloc « Position de la balle » présente la position de la balle au fil de la partie, pour montrer quelle équipe pousse et à quels moments. Une phrase d'introduction l'explique : plus la zone est haute, plus la balle est proche de la cage bleue. Une fois un joueur sélectionné, cette phrase porte aussi sur lui, cite son nom et parle de « la zone ou la ligne pointillée ». Il prend la forme d'un graphique en aires : l'axe horizontal est le temps de la partie, gradué à chaque minute entière, et une ligne médiane représente le milieu du terrain. Quand la balle est dans la moitié de terrain de l'équipe orange, l'aire est orange et en dessous de la ligne médiane. Quand elle est dans la moitié de l'équipe bleue, l'aire est bleue et au-dessus. Plus la balle est proche d'une cage, plus l'aire est haute ou basse. Les libellés « Côté bleu » en haut et « Côté orange » en bas, à gauche du graphique, indiquent la moitié de terrain que représente chaque côté. Sans données de position, le bloc affiche « Pas de données de position pour cette partie. »
+
+Une fois un joueur sélectionné, le bloc superpose à l'aire de la balle la position de ce joueur sur la longueur du terrain, sous la forme d'une ligne blanche fine en pointillés, entourée d'un contour sombre semi-transparent pour qu'elle reste lisible sans masquer l'aire, et qui suit la même échelle que l'aire. Plus le joueur est proche d'une cage, plus la ligne est haute ou basse. Cette représentation ne dépend pas de l'équipe du joueur. Une légende sous le graphique distingue la balle et le joueur, dont elle indique le nom et l'équipe. Elle n'apparaît que lorsqu'un joueur est sélectionné. Cliquer sur un élément de la légende masque la balle ou le joueur sur le graphique, et un nouveau clic le réaffiche ; un élément masqué est grisé et barré dans la légende. Tout est affiché à l'arrivée sur l'écran.
+
+Le bloc « Distance à la balle » présente la distance entre le joueur sélectionné et la balle au fil de la partie, sous forme de courbe. Sous le titre, le bloc indique le nom et l'équipe du joueur. L'axe vertical est la distance, gradué, dans la même unité que la distance moyenne à la balle des statistiques détaillées. Une légende sous le graphique indique que la courbe est la distance entre le joueur et la balle, en unités du jeu. Sans données de position, le bloc affiche le même message.
+
+Sur les deux graphiques, la molette de la souris zoome et dézoome sur l'axe du temps, autour de la position du pointeur, et cliquer puis glisser fait défiler le temps. Le zoom et le défilement sont synchronisés : les deux graphiques affichent toujours la même portion de la partie. Quand le zoom augmente, les graduations de temps se rapprochent (jusqu'à la seconde) pour rester lisibles. Dézoomer ramène au plus à la partie entière. Tant que le pointeur survole un graphique, la molette ne fait pas défiler la page.
+
+Les positions utilisées proviennent de `map.json`.
+
 ## Maquettes
-Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
+Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
 ## Statistiques de la partie
 Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir #3 et #4.
@@ -128,8 +173,9 @@ Pour un joueur choisi, l'application affiche des statistiques détaillées regro
 Le déplacement et le positionnement sont calculés à partir de `map.json`.
 
 ### Graphiques
-L'application présente deux graphiques :
-- **Momentum** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments.
+L'application présente trois graphiques :
+- **Position de la balle** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments. Il s'affiche sur l'écran Positionnement, où la position du joueur sélectionné peut lui être superposée. Voir #35.
+- **Distance à la balle** : la distance entre le joueur sélectionné et la balle au fil de la partie. Il s'affiche sur l'écran Positionnement. Voir #35.
 - **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés.
   - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms (insensible à la casse et aux accents) au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
   - La légende liste les joueurs par équipe (bleue puis orange), puis par ordre alphabétique des noms (insensible à la casse et aux accents). Elle est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.

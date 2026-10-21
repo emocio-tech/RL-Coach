@@ -1,46 +1,121 @@
-import { memo, useId, useMemo,useState } from "react";
+import { memo, useId, useMemo, useState } from "react";
+import {
+  FULL_VIEW, H, MID, TICK_Y, W, X0, X1,
+  areaPath, distancePaths, distanceScale, fillGaps, lineSegments, timeTicks,
+} from "./chartGeometry.js";
 import { sortPlayers } from "./playerOrder.js";
-const FIELD_HALF_LENGTH = 5120;
+import { useChartZoom } from "./useChartZoom.js";
 
-// Ball position along the long axis over time. Team 0 (blue) defends the negative y side:
-// ball on the positive side = blue pressure (top), negative side = orange pressure (bottom).
-export function MomentumChart({ ballY, sampleSeconds }) {
-  const values = [];
-  let last = 0;
-  for (const v of ballY) {
-    last = v ?? last;
-    values.push(last);
-  }
-  if (values.length < 2) return <p className="empty">Pas de données de position pour cette partie.</p>;
+const NO_POSITION = "Pas de données de position pour cette partie.";
 
-  const W = 1000;
-  const H = 260;
-  const mid = H / 2;
-  const x = (i) => (i / (values.length - 1)) * W;
-  const y = (v) => (v / FIELD_HALF_LENGTH) * (mid - 6);
-  const area = (clamp, color) => {
-    const pts = values.map((v, i) => `${x(i).toFixed(1)},${(mid - y(clamp(v))).toFixed(1)}`);
-    return <path d={`M0,${mid} L${pts.join(" L")} L${W},${mid} Z`} fill={color} />;
-  };
+function TimeTicks({ count, sampleSeconds, view }) {
+  return timeTicks(count, sampleSeconds ?? 0.2, view).map((tick) => (
+    <text key={tick.label} x={tick.x} y={TICK_Y} fill="var(--muted)" fontSize="13" textAnchor={tick.anchor}>
+      {tick.label}
+    </text>
+  ));
+}
 
-  const total = (values.length - 1) * (sampleSeconds ?? 0.2);
-  const ticks = Array.from({ length: Math.floor(total / 60) + 1 }, (_, m) => m);
+// Keeps what is drawn between the value axis and the right edge while zoomed in.
+function PlotClip({ id }) {
+  return (
+    <clipPath id={id}>
+      <rect x={X0} y="0" width={X1 - X0} height={H} />
+    </clipPath>
+  );
+}
+
+// Ball (area) and optional player (dashed line) position along the long axis over time.
+// Team 0 (blue) defends the negative y side: negative y = blue half = top, positive y = orange half = bottom.
+// `view` / `onViewChange` hold the zoom, shared with the other chart of the page.
+export function BallPositionChart({ ballY, playerY, playerLabel, sampleSeconds, view = FULL_VIEW, onViewChange }) {
+  const zoom = useChartZoom(view, onViewChange);
+  const [hidden, setHidden] = useState(() => new Set());
+  if (ballY.length < 2) return <p className="empty">{NO_POSITION}</p>;
+
+  const toggle = (key) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  // The legend only exists with a player: without it the ball cannot be hidden.
+  const showBall = !playerY || !hidden.has("ball");
+  const showPlayer = !hidden.has("player");
+  const values = fillGaps(ballY);
+  const playerSegments = playerY && showPlayer ? lineSegments(playerY, view) : [];
 
   return (
     <>
-      <svg className="chart" viewBox={`0 0 ${W} ${H + 24}`} role="img" aria-label="Pression bleue et orange au fil du match">
-        {area((v) => Math.max(0, v), "var(--blue)")}
-        {area((v) => Math.min(0, v), "var(--orange)")}
-        <line x1="0" x2={W} y1={mid} y2={mid} stroke="#fff" strokeOpacity="0.6" />
-        {ticks.map((m) => (
-          <text key={m} x={Math.min(W - 14, (m * 60 / total) * W)} y={H + 18} fill="var(--muted)" fontSize="13" textAnchor={m === 0 ? "start" : "middle"}>
-            {m}:00
-          </text>
+      <svg {...zoom} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Position de la balle au fil du match">
+        <defs><PlotClip id="clip-ball-position" /></defs>
+        <rect width={W} height={H} fill="var(--bg)" />
+        <g clipPath="url(#clip-ball-position)">
+          {showBall && (
+            <>
+              <path d={areaPath(values, (v) => Math.min(0, v), view)} fill="var(--blue)" />
+              <path d={areaPath(values, (v) => Math.max(0, v), view)} fill="var(--orange)" />
+            </>
+          )}
+          <line x1={X0} x2={X1} y1={MID} y2={MID} stroke="#fff" strokeOpacity="0.6" strokeWidth="2" />
+          {playerSegments.map((points) => (
+            <g key={points} fill="none" strokeLinejoin="round" strokeLinecap="round">
+              <polyline points={points} stroke="var(--bg)" strokeOpacity="0.5" strokeWidth="3.5" />
+              <polyline points={points} stroke="#fff" strokeWidth="1.5" strokeDasharray="6 4" />
+            </g>
+          ))}
+        </g>
+        <text x="88" y="30" fill="var(--muted)" fontSize="12" textAnchor="end">Côté bleu</text>
+        <text x="88" y="178" fill="var(--muted)" fontSize="12" textAnchor="end">Côté orange</text>
+        <TimeTicks count={values.length} sampleSeconds={sampleSeconds} view={view} />
+      </svg>
+      {playerY && (
+        <div className="chart-legend">
+          <button type="button" className="chart-legend-toggle" aria-pressed={showBall} onClick={() => toggle("ball")}>
+            <i className="legend-ball" /> Balle
+          </button>
+          <button type="button" className="chart-legend-toggle" aria-pressed={showPlayer} onClick={() => toggle("player")}>
+            <i className="legend-dash" /> Joueur : {playerLabel}
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// Distance between the selected player and the ball over time (3D, game units).
+export function DistanceChart({ distance, sampleSeconds, view = FULL_VIEW, onViewChange }) {
+  const zoom = useChartZoom(view, onViewChange);
+  if (distance.length < 2 || distance.every((d) => d == null)) return <p className="empty">{NO_POSITION}</p>;
+
+  const { max, ticks } = distanceScale(distance);
+  const { lines, area } = distancePaths(distance, max, view);
+
+  return (
+    <>
+      <svg {...zoom} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Distance entre le joueur et la balle au fil du match">
+        <defs><PlotClip id="clip-ball-distance" /></defs>
+        <rect width={W} height={H} fill="var(--bg)" />
+        {ticks.map((tick) => (
+          <g key={tick.value}>
+            <line x1={X0} x2={X1} y1={tick.y} y2={tick.y} stroke="#fff" strokeOpacity="0.18" />
+            <text x="88" y={tick.y + 4} fill="var(--muted)" fontSize="12" textAnchor="end">
+              {tick.value.toLocaleString("fr-FR")}
+            </text>
+          </g>
         ))}
+        <g clipPath="url(#clip-ball-distance)">
+          {area.map((d) => (
+            <path key={d} d={d} fill="#5EEAD4" fillOpacity="0.18" />
+          ))}
+          {lines.map((points) => (
+            <polyline key={points} points={points} fill="none" stroke="#5EEAD4" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+          ))}
+        </g>
+        <TimeTicks count={distance.length} sampleSeconds={sampleSeconds} view={view} />
       </svg>
       <div className="chart-legend">
-        <span><i className="dot" style={{ background: "var(--blue)" }} /> Pression bleue (balle côté orange)</span>
-        <span><i className="dot" style={{ background: "var(--orange)" }} /> Pression orange (balle côté bleu)</span>
+        <span><i className="dot" style={{ background: "#5EEAD4" }} /> Distance entre le joueur et la balle (unités du jeu)</span>
       </div>
     </>
   );

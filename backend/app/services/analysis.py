@@ -118,5 +118,8 @@ def _positioning(map_file: MapFile) -> dict[str, PlayerDetail]:
             first_man_pct=_pct(ranks.count(0), len(ranks)),
             second_man_pct=_pct(ranks.count(1), len(ranks)),
             third_man_pct=_pct(ranks.count(2), len(ranks)),
+            # Series aligned on the ball samples (same length as ball_y), None where untracked.
+            y=[track.y[k] if k < len(track.y) else None for k in range(n_samples)],
+            ball_distance=[None if d is None else round(d, 1) for d in ball_distance[i]],
         )
     return details
