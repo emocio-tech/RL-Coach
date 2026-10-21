@@ -35,6 +35,7 @@ def build_report(game_id: str, stats_file: StatsFile, map_file: MapFile | None) 
         ],
         ball_y=list(map_file.ball.y) if map_file else [],
         sample_seconds=SAMPLE_SECONDS if map_file else None,
+        events=list(stats_file.events),
     )
 
 

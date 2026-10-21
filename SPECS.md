@@ -116,6 +116,17 @@ L'application présente deux graphiques :
 - **Momentum** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments.
 - **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie.
 
+## Coach IA (chat)
+Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur toutes les pages. Elle ouvre un panneau de discussion avec un coach eSport IA spécialisé dans Rocket League, qui s'adresse à l'utilisateur à la deuxième personne du singulier.
+
+- La conversation est conservée tant que la page n'est pas rechargée, y compris quand l'utilisateur change de page. Elle n'est pas sauvegardée au-delà.
+- L'utilisateur envoie son message avec le bouton « Envoyer » ou la touche Entrée. L'envoi est impossible si le champ est vide ou si une réponse est en cours. La réponse s'affiche en une fois.
+- Les 20 derniers messages sont pris en compte, chacun limité à 2000 caractères.
+- Quand une partie est ouverte, le coach s'appuie sur ses statistiques (résumé du match, statistiques d'un joueur, comparaison des joueurs) et ne donne aucun chiffre qu'il n'a pas lu. Il tient compte du joueur sélectionné.
+- Sans partie ouverte, le coach donne uniquement des conseils généraux, sans statistiques.
+- Le coach refuse les sujets sans rapport avec Rocket League.
+- En cas de problème (coach non configuré, indisponible ou trop lent), un message d'erreur en français s'affiche dans le panneau.
+
 <details>
 <summary>Historique des versions</summary>
 
@@ -129,7 +140,8 @@ L'application présente deux graphiques :
 | 6 | 2026-10-20 14:54 | TatouGou | issue-4-core-match-stats |
 | 7 | 2026-10-20 14:55 | iwao | issue-13-interface-design |
 | 8 | 2026-10-20 15:00 | TatouGou | issue-4-core-match-stats |
-| 9 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
-| 10 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
+| 9 | 2026-10-21 08:51 | Chauvin Matthieu | issue-10-llm-chat-precision |
+| 10 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
+| 11 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
 
 </details>

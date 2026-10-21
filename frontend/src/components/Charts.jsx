@@ -44,6 +44,52 @@ export function MomentumChart({ ballY, sampleSeconds }) {
   );
 }
 
+// Time spent per field cell: heatmap.counts[xCell][yCell]. Same orientation as MomentumChart:
+// positive y (orange goal) at the top, negative y (blue goal) at the bottom.
+export function HeatmapChart({ player, team, heatmap }) {
+  const counts = heatmap.counts;
+  const gx = counts.length;
+  const gy = gx ? counts[0].length : 0;
+  const max = Math.max(0, ...counts.flat());
+  if (!max) return <p className="empty">Pas de données de position pour {player}.</p>;
+
+  const W = 200;
+  const H = 250;
+  const cw = W / gx;
+  const ch = H / gy;
+
+  return (
+    <figure className="heatmap">
+      <figcaption className={team === 0 ? "team-blue" : "team-orange"}>{player}</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Carte de chaleur des positions de ${player}`}>
+        <rect width={W} height={H} fill="#0a1236" />
+        {counts.map((column, ix) =>
+          column.map((count, iy) =>
+            count > 0 ? (
+              <rect
+                key={`${ix}-${iy}`}
+                x={ix * cw}
+                y={(gy - 1 - iy) * ch}
+                width={cw}
+                height={ch}
+                fill="var(--orange)"
+                fillOpacity={Math.sqrt(count / max) * 0.9}
+              />
+            ) : null
+          )
+        )}
+        <g stroke="#fff" strokeOpacity="0.55" strokeWidth="1" fill="none">
+          <rect x="0.5" y="0.5" width={W - 1} height={H - 1} />
+          <line x1="0" x2={W} y1={H / 2} y2={H / 2} />
+          <circle cx={W / 2} cy={H / 2} r="22" />
+        </g>
+        <rect x={W / 2 - 22} y={H - 3} width="44" height="3" fill="var(--blue)" />
+        <rect x={W / 2 - 22} y="0" width="44" height="3" fill="var(--orange)" />
+      </svg>
+    </figure>
+  );
+}
+
 const RADAR_AXES = [
   ["Vitesse moy.", (p) => p.detail.avg_speed],
   ["Boost moy.", (p) => p.stats.boost.average_level],

@@ -18,6 +18,18 @@ Depuis la racine du dépôt : `.\scripts\install-rrrocket.ps1` (télécharge la 
 
 Manuellement : télécharger `rrrocket-0.11.8-x86_64-pc-windows-msvc.zip` depuis https://github.com/nickbabcock/rrrocket/releases/tag/v0.11.8, puis extraire `rrrocket.exe` dans `backend/bin/`. Le chemin peut être modifié via la variable d'environnement `RRROCKET_PATH`.
 
+### Coach IA (variables d'environnement)
+
+Le chat du coach appelle un LLM via le SDK OpenAI. Copier `.env.example` en `.env` à la racine du dépôt (ignoré par Git) et renseigner :
+
+| Variable | Rôle | Défaut |
+|----------|------|--------|
+| `OPENAI_API_KEY` | clé API (obligatoire pour le chat) | vide |
+| `OPENAI_BASE_URL` | URL de l'API compatible OpenAI | URL par défaut du SDK |
+| `LLM_MODEL` | modèle utilisé | `nova-lite` |
+
+Sans clé, le chat répond par une erreur 503 ; le reste de l'application fonctionne normalement. Redémarrer le back après modification du `.env`.
+
 ## Installation
 
 Depuis la racine du dépôt, en PowerShell.
@@ -101,8 +113,8 @@ RL-Coach/
 │   ├── app/
 │   │   ├── main.py            # app FastAPI, CORS, routers
 │   │   ├── config.py          # chemins, taille max d'upload, origines CORS
-│   │   ├── api/routes/        # endpoints HTTP (replays)
-│   │   ├── services/          # storage, parser, stats
+│   │   ├── api/routes/        # endpoints HTTP (replays, chat)
+│   │   ├── services/          # storage, parser, stats, coach (LLM)
 │   │   └── schemas/           # modèles Pydantic
 │   ├── tests/
 │   └── requirements.txt

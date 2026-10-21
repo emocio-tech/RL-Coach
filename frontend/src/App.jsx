@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { getReplayStats } from "./api/client.js";
+import ChatBubble from "./components/ChatBubble.jsx";
 import Layout from "./components/Layout.jsx";
 import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
@@ -71,8 +72,10 @@ export default function App() {
     }
   }
 
-  if (page === "home" || !report) {
-    return (
+  const playerNames = useMemo(() => report?.players.map((p) => p.stats.name), [report]);
+
+  const content =
+    page === "home" || !report ? (
       <Home
         onUploaded={handleUploaded}
         onOpenGame={openGame}
@@ -80,10 +83,23 @@ export default function App() {
         hasReport={Boolean(report)}
         onOpenReport={() => setPage("overview")}
       />
+    ) : (
+      <Layout
+        page={page}
+        onNavigate={setPage}
+        players={report.players.map((p) => p.stats)}
+        selectedPlayer={selectedPlayer}
+        onSelectPlayer={setSelectedPlayer}
+      >
+        <OverviewPage report={report} selectedPlayer={selectedPlayer} />
+      </Layout>
     );
-  }
 
   return (
+    <>
+      {content}
+      <ChatBubble gameId={report?.id} players={playerNames} selectedPlayer={selectedPlayer} />
+    </>
     <Layout
       page={page}
       onNavigate={setPage}

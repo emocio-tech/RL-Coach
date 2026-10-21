@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -80,11 +82,20 @@ class PlayerFullStats(PlayerStats):
     boost: BoostStats
 
 
+class MatchEvent(BaseModel):
+    seconds: float  # elapsed since the start of the replay (not "t": stats.json must hold no tracking keys)
+    type: Literal["goal", "assist", "shot", "save", "demolition"]
+    player: str
+    team: int
+    victim: str | None = None
+
+
 class StatsFile(BaseModel):
     replay_id: str
     original_filename: str
     match: MatchStats
     players: list[PlayerFullStats]
+    events: list[MatchEvent] = []
 
 
 class PlayerMap(BaseModel):
@@ -128,3 +139,4 @@ class GameReport(BaseModel):
     players: list[PlayerReport]
     ball_y: list[float | None] = []
     sample_seconds: float | None = None
+    events: list[MatchEvent] = []

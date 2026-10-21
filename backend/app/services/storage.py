@@ -8,8 +8,8 @@ from fastapi import UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from app import config
-from app.schemas.replay import GameReport, MapFile, ReplaySummary, StatsFile, UploadResult
-from app.services import analysis, maps, parser, stats
+from app.schemas.replay import GameReport, MapFile, PlayerMap, StatsFile, UploadResult, ReplaySummary
+from app.services import analysis, parser, stats, maps
 
 CHUNK_SIZE = 1024 * 1024
 GAME_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -93,6 +93,16 @@ def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
 
+def get_player_map(game_id: str, player_name: str) -> PlayerMap | None:
+    """Heatmap and track of one player (name compared ignoring case), or None if unavailable."""
+    if not GAME_ID_PATTERN.fullmatch(game_id):
+        return None
+    map_path = config.GAMES_DIR / game_id / config.MAP_FILENAME
+    if not map_path.is_file():
+        return None
+    map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+    wanted = player_name.strip().casefold()
+    return next((p for p in map_file.players if p.name.casefold() == wanted), None)
 
 def list_games() -> list[ReplaySummary]:
     """Imported games, most recent import first. The import date is the mtime of stats.json."""

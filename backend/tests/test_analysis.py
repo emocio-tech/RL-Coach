@@ -1,6 +1,9 @@
+import json
+
 import pytest
 
 from app import config
+from app.schemas.replay import MatchEvent
 from app.services import analysis, stats
 
 GAME_ID = "Stadium_P_Online-1v1_abc"
@@ -114,6 +117,41 @@ def test_build_report_ignores_missing_speed_samples(files):
     assert alice.avg_speed == 500.0
 
 
+def test_build_report_copies_events(files):
+    stats_file, map_file = files
+    stats_file.events = [
+        MatchEvent(seconds=1.0, type="goal", player="Alice", team=0),
+        MatchEvent(seconds=2.5, type="demolition", player="Bob", team=1, victim="Alice"),
+    ]
+
+    report = analysis.build_report(GAME_ID, stats_file, map_file)
+
+    assert report.events == stats_file.events
+
+
+def test_build_report_events_empty_when_stats_file_has_none(files):
+    assert analysis.build_report(GAME_ID, *files).events == []
+
+
+def test_build_report_keeps_events_without_map_file(files):
+    stats_file, _ = files
+    stats_file.events = [MatchEvent(seconds=1.0, type="save", player="Bob", team=1)]
+
+    report = analysis.build_report(GAME_ID, stats_file, None)
+
+    assert [e.type for e in report.events] == ["save"]
+
+
+def test_build_report_events_list_is_not_shared_with_stats_file(files):
+    stats_file, map_file = files
+    stats_file.events = [MatchEvent(seconds=1.0, type="goal", player="Alice", team=0)]
+
+    report = analysis.build_report(GAME_ID, stats_file, map_file)
+    report.events.append(MatchEvent(seconds=2.0, type="shot", player="Bob", team=1))
+
+    assert len(stats_file.events) == 1
+
+
 def _write_game(games_dir, files, with_map=True):
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
@@ -142,6 +180,28 @@ def test_get_stats_endpoint_exposes_momentum(client, files, games_dir):
 
     assert body["ball_y"] == files[1].ball.y
     assert body["sample_seconds"] == pytest.approx(1 / config.FRAME_SAMPLE_HZ)
+
+
+def test_get_stats_endpoint_exposes_events(client, files, games_dir):
+    files[0].events = [MatchEvent(seconds=83.7, type="goal", player="Alice", team=0)]
+    _write_game(games_dir, files)
+
+    body = client.get(f"/api/replays/{GAME_ID}/stats").json()
+
+    assert body["events"] == [{"seconds": 83.7, "type": "goal", "player": "Alice", "team": 0, "victim": None}]
+
+
+def test_get_stats_endpoint_old_stats_file_without_events_key(client, files, games_dir):
+    _write_game(games_dir, files)
+    stats_path = games_dir / GAME_ID / config.STATS_FILENAME
+    data = json.loads(stats_path.read_text(encoding="utf-8"))
+    del data["events"]
+    stats_path.write_text(json.dumps(data), encoding="utf-8")
+
+    response = client.get(f"/api/replays/{GAME_ID}/stats")
+
+    assert response.status_code == 200
+    assert response.json()["events"] == []
 
 
 def test_get_stats_endpoint_without_map_file(client, files, games_dir):
