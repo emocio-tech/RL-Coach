@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.schemas.replay import GameReport, ReplaySummary, UploadResult
+from app.schemas.replay import GameReport, MatchTracks, ReplaySummary, UploadResult
 from app.services import storage
 
 router = APIRouter()
@@ -17,6 +17,14 @@ async def upload_replay(file: UploadFile):
 @router.get("", response_model=list[ReplaySummary])
 def list_replays():
     return storage.list_games()
+
+
+@router.get("/{game_id}/tracks", response_model=MatchTracks)
+def get_game_tracks(game_id: str):
+    tracks = storage.get_game_tracks(game_id)
+    if tracks is None:
+        raise HTTPException(status_code=404, detail="Tracking data not found")
+    return tracks
 
 
 @router.get("/{game_id}/stats", response_model=GameReport)

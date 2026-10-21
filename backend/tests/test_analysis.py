@@ -173,6 +173,46 @@ def test_get_stats_endpoint(client, files, games_dir):
     assert "demolitions" in body["players"][0]["stats"]
 
 
+def test_get_tracks_endpoint_returns_player_and_ball_tracks(client, files, games_dir):
+    _write_game(games_dir, files)
+
+    response = client.get(f"/api/replays/{GAME_ID}/tracks")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [p["name"] for p in body["players"]] == ["Alice", "Bob"]
+    assert body["players"][0]["team"] == 0
+    assert set(body["players"][0]["track"]) >= {"t", "x", "y", "z", "qx", "qy", "qz", "qw", "boost", "speed"}
+    assert body["ball"]["t"] == files[1].ball.t
+    assert "heatmap" not in body["players"][0]
+
+
+def test_get_tracks_endpoint_without_map_file_returns_404(client, files, games_dir):
+    _write_game(games_dir, files, with_map=False)
+
+    assert client.get(f"/api/replays/{GAME_ID}/tracks").status_code == 404
+
+
+def test_get_tracks_endpoint_with_old_map_format_returns_404(client, files, games_dir):
+    _write_game(games_dir, files)
+    map_path = games_dir / GAME_ID / config.MAP_FILENAME
+    old_map = json.loads(map_path.read_text(encoding="utf-8"))
+    for player in old_map["players"]:
+        for key in ("qx", "qy", "qz", "qw"):
+            del player["track"][key]
+    map_path.write_text(json.dumps(old_map), encoding="utf-8")
+
+    response = client.get(f"/api/replays/{GAME_ID}/tracks")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Tracking data not found"
+
+
+@pytest.mark.parametrize("game_id", ["unknown", "..", ".hidden"])
+def test_get_tracks_unknown_id_returns_404(client, game_id):
+    assert client.get(f"/api/replays/{game_id}/tracks").status_code == 404
+
+
 def test_get_stats_endpoint_exposes_momentum(client, files, games_dir):
     _write_game(games_dir, files)
 

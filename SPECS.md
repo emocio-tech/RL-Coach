@@ -51,7 +51,7 @@ Toutes les pages de l'application, sauf l'écran d'accueil, ont la même structu
 
 Le header affiche le logo RL-Coach. Il reste fixe en haut de la page quand l'utilisateur fait défiler le contenu, sauf sur mobile où il défile avec la page. Il contient aussi un menu déroulant qui permet de sélectionner un joueur parmi tous ceux de la partie ouverte. Le joueur sélectionné est utilisé par plusieurs pages de l'application. À l'arrivée sur une partie, aucun joueur n'est sélectionné : à chaque fois qu'une autre partie est chargée, le joueur sélectionné est réinitialisé.
 
-La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline » et « Heatmaps ».
+La sidebar permet de naviguer entre les pages. Ses liens sont regroupés en sections. Le lien de la page courante a un style différent des autres, pour indiquer qu'il est sélectionné. La sidebar contient le lien « Accueil », hors section, qui ramène à l'écran d'accueil, la section « Statistiques », qui contient le lien « Vue d'ensemble », et la section « Déroulé », qui contient les liens « Timeline », « Heatmaps » et « Vue 3D ».
 
 ## Écran Vue d'ensemble
 L'écran Vue d'ensemble est l'écran principal de statistiques de la partie sélectionnée, lues depuis ses fichiers JSON. Sa page s'intitule « Vue d'ensemble » et se compose de deux blocs.
@@ -92,6 +92,22 @@ Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de ce
 Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
 
 Les positions utilisées proviennent de `map.json`.
+
+## Écran Vue 3D
+L'écran Vue 3D rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Vue 3D » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir #8.
+
+Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Une voiture démolie disparaît jusqu'à sa réapparition. Le terrain est le même pour toutes les cartes.
+
+Le bloc affiche aussi :
+- le score et le chrono de la rediffusion, calculés à partir des buts, et un bandeau « BUT ! » avec le buteur et le passeur pendant 4 secondes après chaque but ;
+- une carte par joueur indiquant son niveau de boost et sa vitesse en km/h. Cliquer sur une carte sélectionne le joueur, comme le menu du header ;
+- des commandes de lecture : lecture/pause, barre de temps avec les buts et les démolitions repérés, et vitesse de lecture de ×0,25 à ×4.
+
+L'utilisateur choisit parmi cinq caméras : libre (à la souris), diffusion, cam balle, poursuite et vue de dessus. Cam balle et poursuite suivent le joueur sélectionné, ou le premier joueur de la liste si aucun n'est sélectionné.
+
+Le second bloc, « Frise du match », reprend la frise de l'écran Timeline, avec un curseur qui indique l'instant de la rediffusion. Cliquer sur un événement amène la rediffusion 3 secondes avant cet événement et la lance. Si la caméra est cam balle ou poursuite, le joueur de l'événement est aussi sélectionné.
+
+Si la partie n'a pas de données de position, un message l'indique à la place de la rediffusion.
 
 ## Maquettes
 Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de l'écran Timeline et de ses tooltips, et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
@@ -144,5 +160,6 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 10 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
 | 11 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
 | 12 | 2026-10-21 09:59 | Dimitri FORT | issue-30-replay-upload-loader |
+| 13 | 2026-10-21 10:41 | TatouGou | issue-8-match-3d-visualization |
 
 </details>
