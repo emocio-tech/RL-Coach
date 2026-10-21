@@ -1,5 +1,5 @@
-import { memo, useId, useMemo } from "react";
 
+import { memo, useId, useMemo,useState } from "react";
 const FIELD_HALF_LENGTH = 5120;
 
 // Ball position along the long axis over time. Team 0 (blue) defends the negative y side:
@@ -152,49 +152,128 @@ const RADAR_AXES = [
   ["% 1er homme", (p) => p.detail.first_man_pct],
   ["% derrière la balle", (p) => p.detail.behind_ball_pct],
 ];
-const PLAYER_COLORS = ["#4d8dff", "#9fc2ff", "#ff8a1f", "#ffc56b"];
+// Cool colours for team 0 (blue), warm colours for team 1 (orange).
+const TEAM_PALETTES = [
+  ["#4d8dff", "#35d0f0", "#a58bff", "#2fd6a8"],
+  ["#ff8a1f", "#ffd23f", "#ff4d4d", "#ff8fb1"],
+];
 
-// Each axis is scaled to the best of the players (100 = best).
-export function StyleRadar({ players }) {
-  const width = 560;
-  const height = 380;
+// Colour by rank within the team; beyond the palette size, colours are reused with dashed strokes.
+function playerColor(team, rank) {
+  const palette = TEAM_PALETTES[team] ?? TEAM_PALETTES[0];
+  return { color: palette[rank % palette.length], dashed: rank >= palette.length };
+}
+
+// Players sorted by team then name, each with its colour and dash flag.
+function styledPlayers(players) {
+  const ranks = new Map();
+  return [...players]
+    .sort((a, b) => a.stats.team - b.stats.team || a.stats.name.localeCompare(b.stats.name))
+    .map((player) => {
+      const team = player.stats.team;
+      const rank = ranks.get(team) ?? 0;
+      ranks.set(team, rank + 1);
+      return { player, team, ...playerColor(team, rank) };
+    });
+}
+
+// Radar grid, axes and one polygon per entry. Maxima are provided by the caller.
+// compact: bigger font and wider viewBox so axis labels stay readable and untruncated when small.
+function RadarSvg({ entries, maxima, label, compact = false }) {
+  const width = compact ? 760 : 560;
+  const height = compact ? 360 : 380;
+  const fontSize = compact ? 20 : 13;
   const c = width / 2;
   const cy = height / 2;
-  const r = 140;
+  const r = compact ? 120 : 140;
   const n = RADAR_AXES.length;
-  const maxima = RADAR_AXES.map(([, get]) => Math.max(1, ...players.map((p) => get(p) ?? 0)));
   const angle = (i) => (-Math.PI / 2) + (i * 2 * Math.PI) / n;
   const point = (i, ratio) => `${(c + Math.cos(angle(i)) * r * ratio).toFixed(1)},${(cy + Math.sin(angle(i)) * r * ratio).toFixed(1)}`;
-  // Same colour order for both teams so each player keeps one colour.
-  const ordered = [...players].sort((a, b) => a.stats.team - b.stats.team);
+
+  return (
+    <svg className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+      {[0.25, 0.5, 0.75, 1].map((ratio) => (
+        <polygon key={ratio} points={RADAR_AXES.map((_, i) => point(i, ratio)).join(" ")} fill="none" stroke="var(--panel-edge)" />
+      ))}
+      {RADAR_AXES.map(([axisLabel], i) => {
+        const [lx, ly] = point(i, 1.18).split(",").map(Number);
+        const anchor = lx < c - 10 ? "end" : lx > c + 10 ? "start" : "middle";
+        return (
+          <g key={axisLabel}>
+            <line x1={c} y1={cy} x2={point(i, 1).split(",")[0]} y2={point(i, 1).split(",")[1]} stroke="var(--panel-edge)" />
+            <text x={lx} y={ly} fill="var(--muted-2)" fontSize={fontSize} textAnchor={anchor} dominantBaseline="middle">{axisLabel}</text>
+          </g>
+        );
+      })}
+      {entries.map(({ player, color, dashed }) => {
+        const pts = RADAR_AXES.map(([, get], i) => point(i, (get(player) ?? 0) / maxima[i])).join(" ");
+        return (
+          <polygon
+            key={player.stats.name}
+            points={pts}
+            fill={color}
+            fillOpacity="0.22"
+            stroke={color}
+            strokeWidth={compact ? 3.5 : 2.5}
+            strokeDasharray={dashed ? "6 4" : undefined}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// Each axis is scaled to the best of ALL the players (100 = best), whatever is hidden.
+// view: "compare" (one radar, toggleable legend) or "players" (one radar per player).
+export function StyleRadar({ players, view = "compare" }) {
+  const [hidden, setHidden] = useState(() => new Set());
+  const maxima = RADAR_AXES.map(([, get]) => Math.max(1, ...players.map((p) => get(p) ?? 0)));
+  const entries = styledPlayers(players);
+
+  if (view === "players") {
+    return (
+      <div className="radar-grid">
+        {entries.map((entry) => (
+          <figure key={entry.player.stats.name} className="radar-item">
+            <figcaption style={{ color: entry.color }}>{entry.player.stats.name}</figcaption>
+            <RadarSvg entries={[entry]} maxima={maxima} compact label={`Radar du style de jeu de ${entry.player.stats.name}`} />
+          </figure>
+        ))}
+      </div>
+    );
+  }
+
+  const visible = entries.filter((e) => !hidden.has(e.player.stats.name));
+  const toggle = (name) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  const label = `Radar du style de jeu${visible.length ? ` : ${visible.map((e) => e.player.stats.name).join(", ")}` : ""}`;
 
   return (
     <div className="radar">
-      <svg className="chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Radar du style de jeu">
-        {[0.25, 0.5, 0.75, 1].map((ratio) => (
-          <polygon key={ratio} points={RADAR_AXES.map((_, i) => point(i, ratio)).join(" ")} fill="none" stroke="var(--panel-edge)" />
-        ))}
-        {RADAR_AXES.map(([label], i) => {
-          const [lx, ly] = point(i, 1.18).split(",").map(Number);
-          const anchor = lx < c - 10 ? "end" : lx > c + 10 ? "start" : "middle";
-          return (
-            <g key={label}>
-              <line x1={c} y1={cy} x2={point(i, 1).split(",")[0]} y2={point(i, 1).split(",")[1]} stroke="var(--panel-edge)" />
-              <text x={lx} y={ly} fill="var(--muted-2)" fontSize="13" textAnchor={anchor} dominantBaseline="middle">{label}</text>
-            </g>
-          );
-        })}
-        {ordered.map((p, k) => {
-          const color = PLAYER_COLORS[k % PLAYER_COLORS.length];
-          const pts = RADAR_AXES.map(([, get], i) => point(i, (get(p) ?? 0) / maxima[i])).join(" ");
-          return <polygon key={p.stats.name} points={pts} fill={color} fillOpacity="0.22" stroke={color} strokeWidth="2.5" />;
-        })}
-      </svg>
-      <div className="chart-legend">
-        {ordered.map((p, k) => (
-          <span key={p.stats.name}>
-            <i className="dot" style={{ background: PLAYER_COLORS[k % PLAYER_COLORS.length] }} /> {p.stats.name}
-          </span>
+      <RadarSvg entries={visible} maxima={maxima} label={label} />
+      {visible.length === 0 && <p className="card-note">Aucun joueur sélectionné</p>}
+      <div aria-label="Légende" role="group" className="radar-legend-teams">
+        {[...new Set(entries.map((e) => e.team))].map((team) => (
+          <ul key={team} className="radar-legend">
+            {entries.filter((e) => e.team === team).map(({ player, color }) => (
+              <li key={player.stats.name}>
+                <button
+                  type="button"
+                  className="radar-legend-toggle"
+                  aria-pressed={!hidden.has(player.stats.name)}
+                  onClick={() => toggle(player.stats.name)}
+                >
+                  <i className="dot" style={{ background: color }} />
+                  {player.stats.name}
+                </button>
+              </li>
+            ))}
+          </ul>
         ))}
       </div>
     </div>

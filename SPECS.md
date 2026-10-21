@@ -42,7 +42,7 @@ L'écran d'accueil est la première page affichée au démarrage de l'applicatio
 - Importer un nouveau fichier de replay depuis son ordinateur, selon le processus décrit dans « Import et stockage des replays ».
 - Sélectionner une partie déjà importée dans un menu déroulant. Chaque entrée indique le nom du fichier d'origine, la date d'import et, quand ils sont disponibles, le score et la carte. La carte est affichée sous son nom dans le jeu, par exemple « DFH Stadium ». Une fois la partie choisie, le bouton « Voir les stats » ouvre l'écran Vue d'ensemble de cette partie. Ce bouton est grisé tant qu'aucune partie n'est choisie.
 
-Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
+Pendant l'import, la zone d'import affiche un loader (cercle animé) et le texte « Analyse en cours… » jusqu'à la fin du traitement. Dès qu'un replay est importé, l'utilisateur arrive sur l'écran Vue d'ensemble de cette partie.
 
 Le bouton « Revoir la dernière partie importée » rouvre l'écran Vue d'ensemble de la dernière partie importée ou ouverte depuis le démarrage de l'application. Il est grisé tant qu'aucune partie n'a été importée ou ouverte.
 
@@ -114,7 +114,10 @@ Le déplacement et le positionnement sont calculés à partir de `map.json`.
 ### Graphiques
 L'application présente deux graphiques :
 - **Momentum** : la position de la balle au fil de la partie, qui montre quelle équipe pousse et à quels moments.
-- **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie.
+- **Style de jeu** : un radar qui compare les joueurs sur cinq critères (vitesse moyenne, boost moyen, part du temps en supersonique, part du temps en 1er homme, part du temps derrière la balle). Chaque critère est comparé au meilleur joueur de la partie (100 % = meilleur joueur), l'échelle restant stable quels que soient les joueurs affichés.
+  - Chaque joueur a une couleur propre à son équipe : nuances froides (bleu, cyan, violet, turquoise) pour l'équipe bleue, nuances chaudes (orange, jaune, rouge, rose) pour l'équipe orange. Les couleurs sont attribuées dans l'ordre alphabétique des noms au sein de l'équipe. Au-delà de 4 joueurs par équipe, les couleurs sont réutilisées avec un trait pointillé.
+  - La légende est cliquable : un clic sur un joueur le masque de la comparaison (il apparaît grisé et barré, comme dans la légende de la Timeline), un nouveau clic le réaffiche. Les axes ne changent pas quand on masque un joueur. Si tous les joueurs sont masqués, le message « Aucun joueur sélectionné » s'affiche. Ce choix est indépendant du joueur sélectionné dans l'en-tête de l'écran.
+  - Un bouton « Comparaison » / « Un graphique par joueur » dans l'en-tête du graphique (absent s'il n'y a qu'un joueur) permet d'afficher un petit radar par joueur, bleus puis oranges, avec le nom dans sa couleur et les mêmes maxima. Tous les joueurs y sont affichés, les masquages ne s'appliquent pas. Ils sont conservés au retour sur la comparaison. Changer de partie réinitialise le mode d'affichage et les masquages.
 
 ## Coach IA (chat)
 Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur toutes les pages. Elle ouvre un panneau de discussion avec un coach eSport IA spécialisé dans Rocket League, qui s'adresse à l'utilisateur à la deuxième personne du singulier.
@@ -143,5 +146,7 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 | 9 | 2026-10-21 08:51 | Chauvin Matthieu | issue-10-llm-chat-precision |
 | 10 | 2026-10-20 15:32 | Dimitri FORT | issue-21-sticky-header-player-select |
 | 11 | 2026-10-20 16:22 | iwao | issue-23-select-imported-game |
+| 12 | 2026-10-21 09:59 | Dimitri FORT | issue-30-replay-upload-loader |
+| 13 | 2026-10-21 10:44 | Dimitri FORT | issue-32-game-style-graphics |
 
 </details>
