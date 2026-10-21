@@ -93,12 +93,19 @@ html { scroll-padding-top: 90px; }
 .option[aria-selected="true"] { background: var(--highlight); }
 .option-name { flex: 1 1 auto; font-weight: 700; }
 .option-team { font-size: 13px; color: var(--muted); }
+.option-group { display: flex; flex-direction: column; gap: 4px; }
+.option-group-title { padding: 6px 12px 2px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 
 /* Layout */
 .body { display: flex; flex-wrap: wrap; flex: 1; align-items: stretch; }
 .sidebar {
   flex: 0 0 240px; min-width: 0; background: var(--bar); padding: 24px 16px;
   display: flex; flex-direction: column; gap: 8px; border-right: 4px solid #121b4d;
+  position: sticky; top: 84px; align-self: flex-start; height: calc(100vh - 84px); overflow-y: auto;
+}
+/* Sidebar wraps above the content on narrow screens: let it scroll with the page */
+@media (max-width: 800px) {
+  .sidebar { position: static; height: auto; }
 }
 .nav-group { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
 .nav-title { padding: 0 16px; font-size: 12px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--blue-soft); }
@@ -418,7 +425,8 @@ td.strong { font-weight: 700; }
 .chip { border: 2px solid var(--blue-light); background: rgba(10, 16, 48, .78); color: #fff; border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 500; backdrop-filter: blur(4px); }
 .chip:hover { background: rgba(27, 37, 89, .95); }
 .chip[aria-pressed="true"] { background: var(--orange); border-color: var(--orange); color: var(--bg); font-weight: 700; }
-.chip-main { background: var(--blue-light); color: var(--bg); font-weight: 700; min-width: 96px; }
+.chip-main { background: var(--blue-light); color: var(--bg); font-weight: 700; min-width: 64px; display: inline-flex; align-items: center; justify-content: center; }
+.chip-main:hover { background: var(--blue); color: var(--text); }
 .viewer-cards { left: 14px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; max-width: 70%; }
 .pcard { --team: var(--blue-light); display: grid; gap: 4px; width: 168px; text-align: left; color: #fff; padding: 8px 12px; border-radius: 14px; border: 2px solid var(--team); background: rgba(10, 16, 48, .8); backdrop-filter: blur(4px); }
 .pcard[aria-pressed="true"] { background: rgba(27, 37, 89, .95); box-shadow: 0 0 0 2px #fff; }

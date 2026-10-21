@@ -7,7 +7,6 @@ import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
 import OverviewPage from "./pages/OverviewPage.jsx";
 import PositioningPage from "./pages/PositioningPage.jsx";
-import TimelinePage from "./pages/TimelinePage.jsx";
 
 const Match3DPage = lazy(() => import("./pages/Match3DPage.jsx"));
 
@@ -103,11 +102,9 @@ export default function App() {
         onSelectPlayer={setSelectedPlayer}
       >
         {page === "match3d" ? (
-          <Suspense fallback={<p className="empty">Chargement de la vue 3D…</p>}>
+          <Suspense fallback={<p className="empty">Chargement du replay…</p>}>
             <Match3DPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
           </Suspense>
-        ) : page === "timeline" ? (
-          <TimelinePage report={report} selectedPlayer={selectedPlayer} />
         ) : page === "positioning" ? (
           <PositioningPage report={report} selectedPlayer={selectedPlayer} />
         ) : (

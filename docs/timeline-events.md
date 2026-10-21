@@ -1,7 +1,7 @@
-# Timeline : frise des événements du match (issue #9)
+# Frise des événements du match, écran Replay (issue #9)
 
 ## Résumé fonctionnel
-L'écran Timeline affiche le déroulé d'une partie sous forme de frise : une bande par joueur, regroupées par équipe, sur laquelle des icônes marquent les buts, passes décisives, tirs, arrêts, démolitions causées (« Démolition ») et subies (« Détruit »). Les instants sont les temps du replay, en secondes depuis le début de l'enregistrement : le compte à rebours et les ralentis après un but sont donc comptés, et la frise peut différer du chrono affiché en jeu. Chaque but est repéré par une barre verticale pointillée et une pastille de score. Le survol (ou le focus clavier) d'une icône ouvre un tooltip avec les détails (passeur, victime, score).
+La frise de l'écran Replay (bloc « Frise du match », sous la rediffusion 3D) affiche le déroulé d'une partie sous forme de frise : une bande par joueur, regroupées par équipe, sur laquelle des icônes marquent les buts, passes décisives, tirs, arrêts, démolitions causées (« Démolition ») et subies (« Détruit »). Les instants sont les temps du replay, en secondes depuis le début de l'enregistrement : le compte à rebours et les ralentis après un but sont donc comptés, et la frise peut différer du chrono affiché en jeu. Chaque but est repéré par une barre verticale pointillée et une pastille de score. Le survol (ou le focus clavier) d'une icône ouvre un tooltip avec les détails (passeur, victime, score).
 
 **Exemple** : un replay se termine sur 2-1. À 1:12 depuis le début du replay, un joueur tire, puis marque à 1:13 sur une passe de son coéquipier. Son tir, proche du but, n'est pas conservé : un seul événement `goal` est affiché, avec le coéquipier en `other` et le score 1-0. Le coéquipier reçoit un événement `assist` dont `other` est le buteur. Les valeurs sont illustratives.
 
@@ -23,7 +23,7 @@ Le front transforme ces événements (`frontend/src/components/timelineEvents.js
 Événement de frise (côté front) : `type` (`goal`, `assist`, `shot`, `save`, `demo_done`, `demo_taken`), `t` (secondes depuis le début du replay), `player`, `team` (0 = bleue, 1 = orange), `other` (`goal` : passeur ; `assist` : buteur ; `demo_done` : victime ; `demo_taken` : démolisseur ; sinon `null`), `score_team0`, `score_team1` (score après l'événement).
 
 ### Affichage
-`frontend/src/pages/TimelinePage.jsx` (bloc « Frise du match ») et `frontend/src/components/Timeline.jsx` : légende des 6 types, une bande par joueur, équipes regroupées et joueurs triés par ordre alphabétique au sein de chaque équipe (bordure blanche pour le joueur sélectionné), légende interactive (un clic sur un type masque ou réaffiche ses événements ; masquer les buts masque aussi barres et pastilles de score), graduation à chaque minute entière, barres et pastilles de score pour les buts, tooltips au survol ou au focus (Échap pour fermer).
+`frontend/src/pages/Match3DPage.jsx` (bloc « Frise du match ») et `frontend/src/components/Timeline.jsx` : légende des 6 types, une bande par joueur, équipes regroupées et joueurs triés par ordre alphabétique au sein de chaque équipe (bordure blanche pour le joueur sélectionné), légende interactive (un clic sur un type masque ou réaffiche ses événements ; masquer les buts masque aussi barres et pastilles de score), graduation à chaque minute entière, barres et pastilles de score pour les buts, tooltips au survol ou au focus (Échap pour fermer).
 
 ### Erreurs
 | Cas | Comportement |

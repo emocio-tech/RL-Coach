@@ -81,7 +81,7 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
 - **Durée minimale visible.** Le zoom s'arrête à 2 % de la partie (`MIN_VIEW_SPAN`).
 - **Position écrêtée.** Les valeurs de y sont ramenées dans ±5120 pour le dessin. Une balle dans le fond d'une cage atteint donc le bord du graphique. La constante est dupliquée dans `analysis.py` et `chartGeometry.js`.
 - **Couleur de la courbe de distance.** Elle est fixée à `#5EEAD4`, indépendante de l'équipe. L'équipe est indiquée par la pastille du sous-titre.
-- **Pas de page Heatmaps.** `SPECS.md` (écran Heatmaps, et lien dans la sidebar de la section « Déroulé ») la décrit, mais elle n'est pas implémentée : `Layout.jsx` ne propose que « Timeline » et « Positionnement », et `App.jsx` ne route aucune page de ce nom. Le composant `HeatmapChart` existe dans `Charts.jsx`, mais il n'est utilisé que par `ChatBubble.jsx`.
+- **Pas de page Heatmaps.** `SPECS.md` (écran Heatmaps, et lien dans la sidebar de la section « Déroulé ») la décrit, mais elle n'est pas implémentée : `Layout.jsx` ne propose que « Replay » et « Positionnement », et `App.jsx` ne route aucune page de ce nom. Le composant `HeatmapChart` existe dans `Charts.jsx`, mais il n'est utilisé que par `ChatBubble.jsx`.
 
 ### Périmètre et limites
 - **Inclus** :
@@ -94,7 +94,7 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
   - Comparaison de plusieurs joueurs sur un même graphique.
   - Survol ou tooltips sur les graphiques.
   - Zoom sur l'axe vertical : seul l'axe du temps se zoome.
-  - Marqueurs d'événements (buts, démolitions) sur ces graphiques : voir `docs/timeline-events.md` pour la Timeline.
+  - Marqueurs d'événements (buts, démolitions) sur ces graphiques : voir `docs/timeline-events.md` pour la frise de l'écran Replay.
 - **Limites** :
   - Toutes les données viennent de `map.json` (5 Hz). Sans lui, la page affiche uniquement des messages d'absence de données.
   - Un seul joueur à la fois pour la ligne de position et la distance.

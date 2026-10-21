@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getReplayTracks } from "../api/client.js";
 import Timeline from "../components/Timeline.jsx";
+import { sortPlayers } from "../components/playerOrder.js";
 import { createEngine } from "../viewer3d/engine.js";
 
 const LEAD_IN = 3; // seconds shown before a timeline event
@@ -35,7 +36,8 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
   const [rate, setRate] = useState(1);
   const [labels, setLabels] = useState(true);
 
-  const players = report.players.map((p) => p.stats);
+  const players = sortPlayers(report.players.map((p) => p.stats));
+  const teamByName = Object.fromEntries(players.map((p) => [p.name, p.team]));
   const target = selectedPlayer ?? players[0]?.name;
   const events = report.events ?? [];
   const goals = useMemo(() => events.filter((e) => e.type === "goal"), [events]);
@@ -59,7 +61,7 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
     try {
       engine = createEngine({ container: containerRef.current, tracks, onTick: setLive });
     } catch (err) {
-      setError(`La vue 3D n'a pas pu démarrer (WebGL indisponible ?) : ${err.message}`);
+      setError(`Le replay n'a pas pu démarrer (WebGL indisponible ?) : ${err.message}`);
       return undefined;
     }
     engineRef.current = engine;
@@ -75,6 +77,14 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks]);
 
+  // The goals (ball hidden + explosion) are pushed after the engine is created, without rebuilding it.
+  useEffect(() => {
+    engineRef.current?.setGoals(goals.map((g) => ({ t: g.seconds })));
+  }, [goals, tracks]);
+  // The demolitions (car hidden until its respawn + red explosion) are pushed the same way.
+  useEffect(() => {
+    engineRef.current?.setDemolitions(demolitions.map((d) => ({ t: d.seconds, victim: d.victim })));
+  }, [demolitions, tracks]);
   useEffect(() => {
     engineRef.current?.setCamera(mode, target);
   }, [mode, target]);
@@ -91,6 +101,8 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
   const lastGoal = [...goals].reverse().find((g) => g.seconds <= live.time && live.time - g.seconds < 4);
   const assist = lastGoal && events.find((e) => e.type === "assist" && Math.abs(e.seconds - lastGoal.seconds) < 1.5 && e.team === lastGoal.team);
 
+  const playLabel = live.playing ? "Pause" : live.time >= duration ? "Rejouer" : "Lecture";
+
   function togglePlay() {
     engineRef.current?.setPlaying(!live.playing);
   }
@@ -101,6 +113,7 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
   function onKeyDown(event) {
     if (event.target.tagName === "INPUT" || event.target.tagName === "SELECT") return;
     if (event.code === "Space") {
+      if (event.target.tagName === "BUTTON") return;
       event.preventDefault();
       togglePlay();
     } else if (event.code === "ArrowRight") seek(event.shiftKey ? 1 : 5);
@@ -127,7 +140,7 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
 
   return (
     <>
-      <h1 className="title page-title">Vue 3D</h1>
+      <h1 className="title page-title">Replay</h1>
       <section className="card viewer-card" aria-label="Rediffusion 3D du match">
         <div className="viewer-stage" ref={stageRef} tabIndex={0} onKeyDown={onKeyDown}>
           <div className="viewer-canvas" ref={containerRef} />
@@ -161,15 +174,20 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
               </div>
 
               <div className="viewer-hud viewer-cards">
-                {(live.players.length ? live.players : players.map((p) => ({ ...p, boost: 0, speed: 0, visible: true }))).map((p) => (
+                {sortPlayers(
+                  live.players.length ? live.players.map((p) => ({ ...p, team: p.team ?? teamByName[p.name] })) : players.map((p) => ({ ...p, boost: 0, speed: 0, visible: true }))
+                ).map((p) => (
                   <button
                     key={p.name}
                     type="button"
                     className="pcard"
                     aria-pressed={p.name === target}
                     style={{ "--team": TEAM_CSS[p.team] }}
-                    onClick={() => onSelectPlayer(p.name)}
-                    title="Suivre ce joueur"
+                    onClick={() => {
+                      onSelectPlayer(p.name);
+                      setMode("ballcam");
+                    }}
+                    title="Suivre ce joueur en cam balle"
                   >
                     <span className="pcard-name">{p.name}{!p.visible && " · démoli"}</span>
                     <span className="pcard-bar"><i style={{ width: `${Math.round(p.boost)}%` }} /></span>
@@ -190,8 +208,10 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
 
         {tracks && !error && (
           <div className="viewer-controls">
-            <button type="button" className="chip chip-main" onClick={togglePlay} aria-label={live.playing ? "Pause" : "Lecture"}>
-              {live.playing ? "Pause" : live.time >= duration ? "Rejouer" : "Lecture"}
+            <button type="button" className="chip chip-main" onClick={togglePlay} aria-label={playLabel} title={playLabel}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                {live.playing ? <path d="M6 4h4v16H6zM14 4h4v16h-4z" /> : <path d="M7 4l13 8-13 8z" />}
+              </svg>
             </button>
             <span className="viewer-time">{clock(live.time)} / {clock(duration)}</span>
             <div className="viewer-scrub">
@@ -226,13 +246,13 @@ export default function Match3DPage({ report, selectedPlayer, onSelectPlayer }) 
         )}
         <p className="card-note">
           Clique-glisse pour tourner, molette pour zoomer (mode Libre). Raccourcis : Espace = lecture/pause, ← → = ±5 s, 1 à 5 = caméras.
-          Les caméras « Cam balle » et « Poursuite » suivent le joueur choisi (clique sur sa carte).
+          Les caméras « Cam balle » et « Poursuite » suivent le joueur choisi ; clique sur sa carte pour le suivre en cam balle.
         </p>
       </section>
 
       <section className="card" aria-labelledby="frise3d-title">
         <h2 id="frise3d-title" className="title card-title">Frise du match</h2>
-        <p className="card-note">Clique sur un événement pour revoir ce moment dans la vue 3D ({LEAD_IN} s avant).</p>
+        <p className="card-note">Clique sur un événement pour revoir ce moment dans le replay ({LEAD_IN} s avant).</p>
         <Timeline
           report={report}
           selectedPlayer={selectedPlayer}

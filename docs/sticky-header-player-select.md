@@ -20,7 +20,7 @@ Dans la Vue d'ensemble, cliquer sur une ligne d'un tableau des scores (ou appuye
 - `html { scroll-padding-top: 90px }` : le focus clavier ne passe pas sous le header.
 - Lignes `tbody tr` : `cursor: pointer`, hover (si `hover: hover`) et `:focus-visible`, `tabIndex={0}`.
 - État partagé : `setSelectedPlayer` (`App.jsx`) est la même fonction pour le menu du header et pour les lignes du tableau.
-- Ordre des joueurs : le menu du header et les tableaux d'équipe utilisent `sortPlayers` (`frontend/src/components/playerOrder.js`) : tri par équipe (bleue puis orange), puis par nom, ordre alphabétique insensible à la casse et aux accents (locale `fr`).
+- Ordre des joueurs : les tableaux d'équipe utilisent `sortPlayers` et le menu du header utilise `groupByTeam` (`frontend/src/components/playerOrder.js`) : tri par équipe (bleue puis orange, puis sans équipe), puis par nom, ordre alphabétique insensible à la casse et aux accents (locale `fr`). Le menu affiche un en-tête non sélectionnable par équipe (« Équipe bleue », « Équipe orange », « Sans équipe ») ; voir `docs/replay-improvements.md`.
 
 ### Erreurs
 Aucune gestion spécifique. Recliquer sur le joueur sélectionné rappelle `setSelectedPlayer` avec la même valeur : l'état ne change pas.
