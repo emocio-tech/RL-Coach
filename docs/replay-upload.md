@@ -49,7 +49,7 @@ Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient 
            "y": [0.0, 0.0, 80.1], "z": [92.8, 92.8, 95.0]}
 }
 ```
-Si l'on réimporte le même replay, un nouveau dossier `UF_Day_P_Online-2v2_900DE226..._2` est créé.
+Si l'on réimporte le même replay, rien n'est écrit : la réponse `201` renvoie le même `{"id": "UF_Day_P_Online-2v2_900DE226..."}`, le dossier et son `stats.json` restent inchangés (date d'import comprise). Le front ouvre la Vue d'ensemble comme pour un nouvel import.
 
 ## Description technique
 
@@ -61,7 +61,7 @@ Si l'on réimporte le même replay, un nouveau dossier `UF_Day_P_Online-2v2_900D
 | `file` | fichier | oui | Nom finissant par `.replay` (insensible à la casse), non vide, 50 Mo maximum (`MAX_UPLOAD_BYTES`, `backend/app/config.py`). |
 
 ### Sorties
-- Réponse `201` : `{"id": "<nom du dossier final>"}` (`UploadResult`). Le nom peut porter un suffixe `_N` en cas de collision (voir ci-dessous).
+- Réponse `201` : `{"id": "<nom du dossier>"}` (`UploadResult`). Pour un replay déjà importé, c'est le nom du dossier existant et rien n'est écrit (voir « Déduplication »). Pour un nouveau replay, le nom peut porter un suffixe `_N` si un autre match occupe déjà ce nom (voir ci-dessous).
 - Dossier `data/games/<nom>/` (`GAMES_DIR`) contenant `stats.json` (`STATS_FILENAME`) et `map.json` (`MAP_FILENAME`). Le dossier `games` est créé à la volée.
 - Écriture atomique : les deux fichiers sont d'abord écrits dans un dossier temporaire `data/games/.tmp-<uuid>`, puis ce dossier est renommé en nom final. En cas d'échec, le dossier temporaire est supprimé.
 - Le `.replay` est copié dans un fichier temporaire de l'OS pour `rrrocket` (`rrrocket -n <fichier>`, timeout 60 s), supprimé ensuite. Il n'est jamais écrit dans `data/`.
@@ -79,8 +79,16 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
   - `replay` si l'Id nettoyé est vide.
 - **Taille d'équipe** : la partie `-<N>v<N>` n'existe que si `TeamSize` est un entier. Elle est omise sinon.
 - **Id absent** : un `uuid4().hex` est généré. Le même id est écrit dans le champ `replay_id` des deux fichiers. Cet id n'est pas nettoyé, contrairement à la partie du nom de dossier.
-- **Collision** : si le dossier existe déjà, le suffixe `_2`, `_3`… est ajouté, jusqu'à 1000 tentatives. Le renommage sert de test de disponibilité. Si le nom reste occupé après 1000 tentatives, une `OSError` est levée. Un chemin sortant de `GAMES_DIR` provoque aussi une `OSError`.
-- **Réimport** : il n'y a pas de déduplication. Un même replay envoyé deux fois donne deux dossiers (`..._<Id>` puis `..._<Id>_2`).
+- **Collision** : si le dossier existe déjà pour un autre match, le suffixe `_2`, `_3`… est ajouté, jusqu'à 1000 tentatives. Le renommage sert de test de disponibilité. Si le nom reste occupé après 1000 tentatives, une `OSError` est levée. Un chemin sortant de `GAMES_DIR` provoque aussi une `OSError`. Le suffixe ne sert donc plus aux réimports, seulement à deux matchs différents qui donnent le même nom (ex. `Id` différents mais identiques une fois nettoyés par `_sanitize`).
+
+#### Déduplication
+`save_replay` appelle `_store_match` (`backend/app/services/storage.py`), qui s'exécute dans un thread sous le verrou `_STORE_LOCK`.
+- **Clé** : `properties["Id"]` du replay, comparé au `replay_id` brut de `stats.json` (non nettoyé).
+- **Replay déjà présent** : `_find_existing_folder` renvoie le dossier trouvé. La route répond `201` avec son nom, sans créer de dossier ni toucher à `stats.json` (la date d'import, mtime de `stats.json`, reste inchangée). `rrrocket` a quand même été exécuté, car le parsing a lieu avant la recherche.
+- **Recherche** : sur le disque, dans l'ordre alphabétique des noms de dossier : le dossier sans suffixe passe avant `_2`, `_3`. Les dossiers `.tmp-*`, les fichiers et les dossiers sans `stats.json` lisible ou valide sont ignorés.
+- **`map.json` manquant** : n'empêche pas la détection du doublon, seul `stats.json` compte.
+- **Replay sans `Id`** (`uuid4` généré) : jamais dédupliqué, chaque envoi crée un dossier.
+- **Concurrence** : le verrou est en mémoire, il protège les imports simultanés d'un même processus uniquement.
 
 ### Contenu de `stats.json` (`StatsFile`)
 - `replay_id` et `original_filename`. Ce dernier est nettoyé : basename, caractères de contrôle retirés, 255 caractères maximum.
@@ -151,16 +159,19 @@ Dans tous les cas d'erreur, aucun dossier définitif n'est laissé : le dossier 
 - **Inclus** :
   - Import d'un `.replay` vers un dossier `stats.json` + `map.json`.
   - Nommage du dossier avec gestion des collisions.
+  - Déduplication des réimports par `Id` de replay.
   - Stats de base, démolitions, boost, heatmap, trajectoires (position, vitesse, boost, orientation) et balle.
 - **Exclu** :
   - Aucune route de lecture ni de liste : le front affiche seulement l'id importé.
   - Aucune migration des anciens fichiers `data/games/<uuid>.json`. Ils restent tels quels et ne sont pas lus.
-  - Aucune déduplication des réimports.
+  - Pas de nettoyage des doublons déjà présents (dossiers `X_2`, `X_3` créés avant la déduplication) : le premier dossier dans l'ordre alphabétique est celui renvoyé au réimport.
+  - Pas de déduplication par hash du contenu, pas de protection multi-workers, pas de message « déjà importé » dans le front.
   - Pas d'orientation pour la balle.
 - **Limites** :
   - La classification petit/gros pad est une heuristique statistique par pad, fondée sur les temps de réapparition, pas sur le type réel de pad. Un pad jamais revu à l'état disponible (aucun délai observé) est classé petit.
   - La map est supposée avoir des pads identifiables par leur nom d'objet. Sans nom de pad, l'identité retombe sur l'identifiant d'acteur, ce qui est moins stable si le replay recrée l'acteur.
   - Les démolitions sont dédoublonnées sur 3 s. Deux vraies démolitions du même attaquant sur la même victime en moins de 3 s sont comptées une seule fois dans `received`. `inflicted` vient en priorité du compteur `MatchDemolishes`.
   - Les joueurs sont associés à leurs voitures, boosts et démolitions par leur nom. Deux joueurs homonymes entrent en collision : ce cas n'est pas géré.
+  - La recherche de doublon parcourt tous les dossiers de `data/games/` et relit chaque `stats.json` à chaque import avec `Id` : le coût croît avec le nombre de matchs.
   - Le fichier est lu en mémoire (par blocs de 1 Mo) et le parsing s'exécute dans un thread.
 - **Dépendances** : binaire `rrrocket`, FastAPI/Starlette (`run_in_threadpool`), Pydantic. Services `parser`, `stats` et `storage` (`backend/app/services/`).
