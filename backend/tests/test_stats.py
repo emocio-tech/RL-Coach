@@ -33,7 +33,7 @@ def _player(data, name):
 
 
 def test_build_match_files_match_fields(fake_raw):
-    stats_file, map_file = _build(fake_raw)
+    stats_file, map_file, _ = _build(fake_raw)
     assert stats_file.replay_id == map_file.replay_id == "abc"
     assert stats_file.original_filename == "game.replay"
     m = stats_file.match
@@ -595,6 +595,15 @@ def _all_keys(value):
 def test_build_match_files_stats_file_has_no_tracking_data(fake_raw_with_events):
     keys = set(_all_keys(_stats(fake_raw_with_events).model_dump()))
     assert not keys & {"x", "y", "z", "t", "track", "heatmap", "ball", "speed", "qx", "qy", "qz", "qw"}
+
+
+def test_build_match_files_heatmap_file_derived_from_player_heatmaps(fake_raw):
+    _, map_file, heatmap_file = _build(fake_raw)
+
+    assert heatmap_file.replay_id == map_file.replay_id == "abc"
+    assert [(p.name, p.team, p.heatmap) for p in heatmap_file.players] == [
+        (p.name, p.team, p.heatmap) for p in map_file.players
+    ]
 
 
 def test_build_match_files_map_file_has_no_stats_data(fake_raw_with_events):

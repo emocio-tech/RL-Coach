@@ -8,7 +8,7 @@ import pytest
 
 from app import config
 from app.schemas.chat import ChatMessage
-from app.schemas.replay import MapFile, MatchEvent
+from app.schemas.replay import HeatmapFile, MatchEvent
 from app.services import coach, stats, storage, training
 
 GAME_ID = "Stadium_P_Online-1v1_abc"
@@ -18,9 +18,10 @@ GAME_ID = "Stadium_P_Online-1v1_abc"
 def game(games_dir, fake_raw):
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
-    (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
     return GAME_ID
 
 
@@ -625,7 +626,7 @@ def test_chat_forced_tool_timeout_is_not_retried(llm, game):
 
 
 def _map_file(game_id):
-    return MapFile.model_validate_json((config.GAMES_DIR / game_id / config.MAP_FILENAME).read_text(encoding="utf-8"))
+    return HeatmapFile.model_validate_json((config.GAMES_DIR / game_id / config.HEATMAP_FILENAME).read_text(encoding="utf-8"))
 
 
 def _stored_counts(game_id, name):
@@ -715,8 +716,8 @@ def test_run_tool_show_heatmap_player_name_missing_or_invalid(game, arguments):
     assert heatmaps == []
 
 
-def test_run_tool_show_heatmap_without_map_file(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
+def test_run_tool_show_heatmap_without_heatmap_file(game):
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).unlink()
     heatmaps = []
 
     result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, heatmaps))
@@ -742,11 +743,11 @@ def test_show_heatmap_tool_requires_player_name():
 
 
 def test_get_player_heatmap(game):
-    player_map = storage.get_player_heatmap(game, "Alice")
+    player_heatmap = storage.get_player_heatmap(game, "Alice")
 
-    assert player_map.name == "Alice"
-    assert player_map.team == 0
-    assert player_map.heatmap.counts == _stored_counts(game, "Alice")
+    assert player_heatmap.name == "Alice"
+    assert player_heatmap.team == 0
+    assert player_heatmap.heatmap.counts == _stored_counts(game, "Alice")
 
 
 def test_get_player_heatmap_case_and_spaces_insensitive(game):
@@ -757,8 +758,8 @@ def test_get_player_heatmap_invalid_game_id(game):
     assert storage.get_player_heatmap("../x", "Alice") is None
 
 
-def test_get_player_heatmap_missing_map_file(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
+def test_get_player_heatmap_missing_heatmap_file(game):
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).unlink()
 
     assert storage.get_player_heatmap(game, "Alice") is None
 
@@ -769,6 +770,23 @@ def test_get_player_heatmap_unknown_game(games_dir):
 
 def test_get_player_heatmap_player_absent(game):
     assert storage.get_player_heatmap(game, "Zed") is None
+
+
+def test_get_player_heatmap_does_not_need_3dmatch_file(game):
+    (config.GAMES_DIR / game / config.MATCH3D_FILENAME).unlink()
+
+    assert storage.get_player_heatmap(game, "Alice").heatmap.counts == _stored_counts(game, "Alice")
+
+
+def test_run_tool_show_heatmap_reads_heatmap_json_without_3dmatch_file(game):
+    (config.GAMES_DIR / game / config.MATCH3D_FILENAME).unlink()
+    heatmaps = []
+
+    result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, heatmaps))
+
+    assert result["displayed"] is True
+    assert [h.player for h in heatmaps] == ["Alice"]
+    assert heatmaps[0].heatmap.counts == _stored_counts(game, "Alice")
 
 
 # ---------- build_system_prompt: show_heatmap ----------
@@ -902,7 +920,7 @@ def test_chat_heatmaps_not_shared_between_calls(llm, game):
 
 
 def test_chat_heatmap_error_for_missing_map_is_sent_to_model(llm, game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).unlink()
     fake = llm([
         _response(tool_calls=[_heatmap_call("h1", "Alice")]),
         _response(content="Pas de carte disponible."),
@@ -1121,10 +1139,11 @@ def write_events(games_dir, fake_raw):
     def write(events):
         folder = games_dir / GAME_ID
         folder.mkdir(parents=True, exist_ok=True)
-        stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+        stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
         stats_file.events = list(events)
         (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
-        (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+        (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+        (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
         return GAME_ID
 
     return write

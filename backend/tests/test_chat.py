@@ -13,9 +13,10 @@ URL = "/api/chat"
 def game(games_dir, fake_raw):
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
-    (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
     return GAME_ID
 
 

@@ -17,8 +17,8 @@ Le front transforme ces événements (`frontend/src/components/timelineEvents.js
 - Tri par instant puis par type : `goal`, `assist`, `shot`, `save`, `demo_done`, `demo_taken`.
 
 ### Sorties
-- `map.json` reçoit `timeline_seconds` : le maximum entre le dernier temps de frame relatif (`frames[-1]["time"] - t0`) et le plus grand `seconds` des événements, arrondi à 0,01. `TotalSecondsPlayed` n'est pas utilisé.
-- `GameReport` expose `events` (copie de `stats.json`) et `timeline_seconds` (`null` sans `map.json`).
+- `3dmatch.json` reçoit `timeline_seconds` : le maximum entre le dernier temps de frame relatif (`frames[-1]["time"] - t0`) et le plus grand `seconds` des événements, arrondi à 0,01. `TotalSecondsPlayed` n'est pas utilisé.
+- `GameReport` expose `events` (copie de `stats.json`) et `timeline_seconds` (`null` sans `3dmatch.json`).
 
 Événement de frise (côté front) : `type` (`goal`, `assist`, `shot`, `save`, `demo_done`, `demo_taken`), `t` (secondes depuis le début du replay), `player`, `team` (0 = bleue, 1 = orange), `other` (`goal` : passeur ; `assist` : buteur ; `demo_done` : victime ; `demo_taken` : démolisseur ; sinon `null`), `score_team0`, `score_team1` (score après l'événement).
 
@@ -29,9 +29,9 @@ Le front transforme ces événements (`frontend/src/components/timelineEvents.js
 | Cas | Comportement |
 |---|---|
 | `game_id` invalide ou inconnu | `404 Replay not found` |
-| `map.json` absent ou sans `timeline_seconds`, ou partie importée avant la feature | `200`, `timeline_seconds = null` (et `events = []` pour une ancienne partie) ; le front affiche « Aucun événement disponible pour cette partie. Réimporte le replay pour afficher la frise. » |
+| `3dmatch.json` absent ou sans `timeline_seconds`, ou partie importée avant la feature | `200`, `timeline_seconds = null` (et `events = []` pour une ancienne partie) ; le front affiche « Aucun événement disponible pour cette partie. Réimporte le replay pour afficher la frise. » |
 
 ### Périmètre
-- **Inclus** : événements aux temps du replay (depuis le début de l'enregistrement), score après chaque événement, `timeline_seconds` dans `map.json`, frise avec tooltips.
+- **Inclus** : événements aux temps du replay (depuis le début de l'enregistrement), score après chaque événement, `timeline_seconds` dans `3dmatch.json`, frise avec tooltips.
 - **Exclu** : recalcul des anciennes parties (réimport nécessaire), filtre par équipe, zoom, sélection d'un joueur depuis sa bande.
 - **Limites connues** : une passe hors de 0,5 s reste un `assist` sans `other` ; les pastilles de score de deux buts très proches peuvent se chevaucher ; les noms de joueurs sont supposés uniques.

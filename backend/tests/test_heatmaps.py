@@ -3,7 +3,7 @@ import json
 import pytest
 
 from app import config
-from app.schemas.replay import MapFile, MatchHeatmaps
+from app.schemas.replay import HeatmapFile, Match3DFile, MatchHeatmaps
 from app.services import coach, stats, storage
 from tests.conftest import BALL_ID, OBJ_RBSTATE
 
@@ -14,15 +14,21 @@ GAME_ID = "Stadium_P_Online-1v1_abc"
 def game(games_dir, fake_raw):
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, match3d_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
-    (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.MATCH3D_FILENAME).write_text(match3d_file.model_dump_json(), encoding="utf-8")
+    (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
     return GAME_ID
 
 
-def _stored_map(game_id):
-    path = config.GAMES_DIR / game_id / config.MAP_FILENAME
-    return MapFile.model_validate_json(path.read_text(encoding="utf-8"))
+def _stored_match3d(game_id):
+    path = config.GAMES_DIR / game_id / config.MATCH3D_FILENAME
+    return Match3DFile.model_validate_json(path.read_text(encoding="utf-8"))
+
+
+def _stored_heatmaps(game_id):
+    path = config.GAMES_DIR / game_id / config.HEATMAP_FILENAME
+    return HeatmapFile.model_validate_json(path.read_text(encoding="utf-8"))
 
 
 def _total(counts):
@@ -208,23 +214,22 @@ def test_dead_ball_mask_empty_input():
 
 
 def test_build_match_files_player_heatmap_matches_heatmap_from_points(fake_raw):
-    # Non-regression: the player heatmap of map.json is the binning of the player's own track
+    # Non-regression: the player heatmap of heatmap.json is the binning of the player's own track
     # (the ball of fake_raw keeps moving, so no sample is dead).
-    map_file = stats.build_match_files("abc", "game.replay", fake_raw)[1]
+    _, match3d_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
 
-    assert not any(stats.dead_ball_mask(map_file.ball.x, map_file.ball.y, map_file.ball.z))
-    assert map_file.players
-    for player in map_file.players:
+    assert not any(stats.dead_ball_mask(match3d_file.ball.x, match3d_file.ball.y, match3d_file.ball.z))
+    assert heatmap_file.players
+    for player, heatmap in zip(match3d_file.players, heatmap_file.players):
         expected = stats.heatmap_from_points(player.track.x, player.track.y)
-        assert player.heatmap.counts == expected.counts
+        assert heatmap.heatmap.counts == expected.counts
 
 
 def test_build_match_files_stores_ball_heatmap_of_ball_track(fake_raw):
-    map_file = stats.build_match_files("abc", "game.replay", fake_raw)[1]
+    _, match3d_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
 
-    assert map_file.ball_heatmap is not None
-    assert map_file.ball_heatmap.counts == stats.heatmap_from_points(map_file.ball.x, map_file.ball.y).counts
-    assert _total(map_file.ball_heatmap.counts) > 0
+    assert heatmap_file.ball.counts == stats.heatmap_from_points(match3d_file.ball.x, match3d_file.ball.y).counts
+    assert _total(heatmap_file.ball.counts) > 0
 
 
 def _freeze_ball_until(raw, last_still_frame, moved_x=500.0):
@@ -240,32 +245,23 @@ def test_build_match_files_heatmaps_ignore_dead_ball_samples(fake_raw):
     # Ball still for frames 0..54 = samples 0..9 (>= DEAD_BALL_MIN_SAMPLES), then it moves: only sample 10 is live.
     _freeze_ball_until(fake_raw, last_still_frame=54)
 
-    map_file = stats.build_match_files("abc", "game.replay", fake_raw)[1]
+    _, match3d_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
 
-    dead = stats.dead_ball_mask(map_file.ball.x, map_file.ball.y, map_file.ball.z)
+    dead = stats.dead_ball_mask(match3d_file.ball.x, match3d_file.ball.y, match3d_file.ball.z)
     assert dead == [True] * 10 + [False]
-    assert _total(map_file.ball_heatmap.counts) == 1
-    for player in map_file.players:
-        assert _total(player.heatmap.counts) == 1
+    assert _total(heatmap_file.ball.counts) == 1
+    for player, heatmap in zip(match3d_file.players, heatmap_file.players):
+        assert _total(heatmap.heatmap.counts) == 1
         # the tracks themselves keep every sample (3D replay, positioning page)
         assert len(player.track.x) == len(dead)
-    assert len(map_file.ball.x) == len(dead)
-
-
-def test_map_file_without_ball_heatmap_is_still_valid(fake_raw):
-    # Files imported before ball_heatmap existed must keep loading.
-    map_file = stats.build_match_files("abc", "game.replay", fake_raw)[1]
-
-    legacy = MapFile.model_validate_json(map_file.model_dump_json(exclude={"ball_heatmap"}))
-
-    assert legacy.ball_heatmap is None
+    assert len(match3d_file.ball.x) == len(dead)
 
 
 # ---------- storage.get_game_heatmaps ----------
 
 
 def test_get_game_heatmaps_players_and_ball(game):
-    stored = _stored_map(game)
+    stored = _stored_heatmaps(game)
 
     result = storage.get_game_heatmaps(game)
 
@@ -276,72 +272,36 @@ def test_get_game_heatmaps_players_and_ball(game):
 
 
 def test_get_game_heatmaps_ball_matches_ball_track(game):
-    stored = _stored_map(game)
+    track = _stored_match3d(game).ball
 
     result = storage.get_game_heatmaps(game)
 
-    assert result.ball.counts == stats.heatmap_from_points(stored.ball.x, stored.ball.y).counts
-    assert _total(result.ball.counts) == len([v for v in stored.ball.x if v is not None]) > 0
+    assert result.ball.counts == stats.heatmap_from_points(track.x, track.y).counts
+    assert _total(result.ball.counts) == len([v for v in track.x if v is not None]) > 0
 
 
-def test_get_game_heatmaps_ball_read_from_map_file_when_stored(game):
-    # A stored ball heatmap is returned as is, not recomputed from the ball track.
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    marker = [[0] * 26 for _ in range(20)]
-    marker[3][4] = 99
-    stored.ball_heatmap = stored.ball_heatmap.model_copy(update={"counts": marker})
+def test_get_game_heatmaps_returns_the_stored_heatmaps_as_is(game):
+    path = config.GAMES_DIR / game / config.HEATMAP_FILENAME
+    stored = _stored_heatmaps(game)
+    ball_marker = [[0] * 26 for _ in range(20)]
+    ball_marker[3][4] = 99
+    player_marker = [[0] * 26 for _ in range(20)]
+    player_marker[1][2] = 7
+    stored.ball = stored.ball.model_copy(update={"counts": ball_marker})
+    stored.players[0].heatmap = stored.players[0].heatmap.model_copy(update={"counts": player_marker})
     path.write_text(stored.model_dump_json(), encoding="utf-8")
 
-    assert storage.get_game_heatmaps(game).ball.counts == marker
-
-
-def test_get_game_heatmaps_read_from_map_file_players_untouched_when_ball_heatmap_stored(game):
-    # With a stored ball heatmap the file is current: player heatmaps are returned exactly as stored.
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    marker = [[0] * 26 for _ in range(20)]
-    marker[1][2] = 7
-    stored.players[0].heatmap = stored.players[0].heatmap.model_copy(update={"counts": marker})
-    path.write_text(stored.model_dump_json(), encoding="utf-8")
-
-    assert storage.get_game_heatmaps(game).players[0].heatmap.counts == marker
-
-
-def test_get_game_heatmaps_ball_recomputed_for_legacy_map_file_without_ball_heatmap(game):
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    stored.ball_heatmap = None
-    path.write_text(stored.model_dump_json(exclude={"ball_heatmap"}), encoding="utf-8")
-    assert "ball_heatmap" not in path.read_text(encoding="utf-8")
-
     result = storage.get_game_heatmaps(game)
 
-    assert result.ball.counts == stats.heatmap_from_points(stored.ball.x, stored.ball.y).counts
-    assert _total(result.ball.counts) > 0
+    assert result.ball.counts == ball_marker
+    assert result.players[0].heatmap.counts == player_marker
 
 
-def test_get_game_heatmaps_legacy_map_file_recomputes_every_heatmap_without_dead_ball_samples(game):
-    # A legacy file counts the dead-ball samples in its stored player heatmaps: they are rebuilt from the tracks.
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    n = len(stored.ball.t)
-    still = stats.DEAD_BALL_MIN_SAMPLES
-    stored.ball.x = [0.0] * still + [1000.0 + 100 * i for i in range(n - still)]
-    stored.ball.y = [0.0] * n
-    stored.ball.z = [93.0] * n
-    for player in stored.players:  # legacy heatmap: every sample counted
-        player.heatmap = stats.heatmap_from_points(player.track.x, player.track.y)
-    path.write_text(stored.model_dump_json(exclude={"ball_heatmap"}), encoding="utf-8")
+def test_get_game_heatmaps_does_not_need_3dmatch_file(game):
+    (config.GAMES_DIR / game / config.MATCH3D_FILENAME).unlink()
+    stored = _stored_heatmaps(game)
 
-    result = storage.get_game_heatmaps(game)
-
-    live = n - still
-    assert _total(result.ball.counts) == live
-    for got, player in zip(result.players, stored.players):
-        assert _total(player.heatmap.counts) == len([v for v in player.track.x if v is not None])
-        assert _total(got.heatmap.counts) == len([v for v in player.track.x[still:] if v is not None])
-        assert _total(got.heatmap.counts) < _total(player.heatmap.counts)
+    assert storage.get_game_heatmaps(game) == MatchHeatmaps(players=stored.players, ball=stored.ball)
 
 
 def test_get_game_heatmaps_invalid_game_id(game):
@@ -356,51 +316,25 @@ def test_get_game_heatmaps_unknown_game(games_dir):
     assert storage.get_game_heatmaps("Missing_Game_1") is None
 
 
-def test_get_game_heatmaps_missing_map_file(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
+def test_get_game_heatmaps_missing_heatmap_file(game):
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).unlink()
 
     assert storage.get_game_heatmaps(game) is None
 
 
 def test_get_game_heatmaps_invalid_json(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).write_text("{not json", encoding="utf-8")
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).write_text("{not json", encoding="utf-8")
 
     assert storage.get_game_heatmaps(game) is None
 
 
 def test_get_game_heatmaps_invalid_schema(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).write_text('{"replay_id": "abc"}', encoding="utf-8")
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).write_text('{"replay_id": "abc"}', encoding="utf-8")
 
     assert storage.get_game_heatmaps(game) is None
 
 
-def test_get_game_heatmaps_ball_without_positions_gives_zero_grid(game):
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    stored.ball.x = [None] * len(stored.ball.x)
-    stored.ball_heatmap = None  # legacy file: the heatmap is recomputed from the (empty) track
-    path.write_text(stored.model_dump_json(), encoding="utf-8")
-
-    assert _total(storage.get_game_heatmaps(game).ball.counts) == 0
-
-
 # ---------- storage.get_player_heatmap and the chat: same heatmaps as the page ----------
-
-
-def _legacy_with_dead_ball(game):
-    """Rewrite the game's map.json as an old file: no stored ball heatmap, player heatmaps counting every sample,
-    and a ball that stays still for the first DEAD_BALL_MIN_SAMPLES samples (a kickoff)."""
-    path = config.GAMES_DIR / game / config.MAP_FILENAME
-    stored = _stored_map(game)
-    n = len(stored.ball.t)
-    still = stats.DEAD_BALL_MIN_SAMPLES
-    stored.ball.x = [0.0] * still + [1000.0 + 100 * i for i in range(n - still)]
-    stored.ball.y = [0.0] * n
-    stored.ball.z = [93.0] * n
-    for player in stored.players:
-        player.heatmap = stats.heatmap_from_points(player.track.x, player.track.y)  # old: every sample counted
-    path.write_text(stored.model_dump_json(exclude={"ball_heatmap"}), encoding="utf-8")
-    return stored
 
 
 def test_get_player_heatmap_is_the_page_heatmap(game):
@@ -410,18 +344,6 @@ def test_get_player_heatmap_is_the_page_heatmap(game):
         assert storage.get_player_heatmap(game, name) == expected
 
 
-def test_get_player_heatmap_is_the_page_heatmap_for_a_legacy_file_too(game):
-    # In an old file the stored player heatmap counts the dead-ball samples; the page recomputes it without them,
-    # and the chat must show the very same one.
-    stored = _legacy_with_dead_ball(game)
-    page = {p.name: p for p in storage.get_game_heatmaps(game).players}
-
-    for player in stored.players:
-        chat = storage.get_player_heatmap(game, player.name)
-        assert chat == page[player.name]
-        assert _total(chat.heatmap.counts) < _total(player.heatmap.counts)  # not the stored, unfiltered one
-
-
 def test_chat_show_heatmap_returns_the_page_heatmap(game):
     heatmaps = []
 
@@ -429,18 +351,6 @@ def test_chat_show_heatmap_returns_the_page_heatmap(game):
 
     page = next(p for p in storage.get_game_heatmaps(game).players if p.name == "Alice")
     assert [(h.player, h.team, h.heatmap) for h in heatmaps] == [(page.name, page.team, page.heatmap)]
-
-
-def test_chat_show_heatmap_returns_the_page_heatmap_for_a_legacy_file_too(game):
-    stored = _legacy_with_dead_ball(game)
-    alice = next(p for p in stored.players if p.name == "Alice")
-    heatmaps = []
-
-    coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, heatmaps)
-
-    page = next(p for p in storage.get_game_heatmaps(game).players if p.name == "Alice")
-    assert heatmaps[0].heatmap == page.heatmap
-    assert _total(heatmaps[0].heatmap.counts) < _total(alice.heatmap.counts)  # the dead-ball samples are left out
 
 
 def test_chat_show_heatmap_for_every_player_matches_the_page(game):
@@ -454,7 +364,7 @@ def test_chat_show_heatmap_for_every_player_matches_the_page(game):
 
 
 def test_chat_show_heatmap_unreadable_map_file_gives_the_error(game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).write_text("{not json", encoding="utf-8")
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).write_text("{not json", encoding="utf-8")
     heatmaps = []
 
     result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, heatmaps))
@@ -497,7 +407,7 @@ def test_heatmaps_route_invalid_game_id_returns_404(client):
     assert response.json() == {"detail": "Heatmap data not found"}
 
 
-def test_heatmaps_route_missing_map_file_returns_404(client, game):
-    (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
+def test_heatmaps_route_missing_heatmap_file_returns_404(client, game):
+    (config.GAMES_DIR / game / config.HEATMAP_FILENAME).unlink()
 
     assert client.get(f"/api/replays/{game}/heatmaps").status_code == 404

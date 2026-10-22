@@ -43,18 +43,18 @@ def _stats_of(games_dir, folder):
     return _read(games_dir, folder, config.STATS_FILENAME)
 
 
-def test_upload_replay_nominal_returns_201_and_writes_stats_and_map(client, games_dir, mock_parse):
+def test_upload_replay_nominal_returns_201_and_writes_stats_3dmatch_and_heatmap(client, games_dir, mock_parse):
     response = _post(client)
     assert response.status_code == 201
     replay_id = response.json()["id"]
     assert replay_id == FOLDER_NAME
     assert [f.name for f in _files(games_dir)] == [replay_id]
-    assert sorted(f.name for f in (games_dir / replay_id).iterdir()) == ["map.json", "stats.json"]
+    assert sorted(f.name for f in (games_dir / replay_id).iterdir()) == ["3dmatch.json", "heatmap.json", "stats.json"]
     stats_data = _stats_of(games_dir, replay_id)
     assert stats_data["replay_id"] == REPLAY_ID
     assert stats_data["original_filename"] == "game.replay"
     assert len(stats_data["players"]) == 2
-    map_data = _read(games_dir, replay_id, config.MAP_FILENAME)
+    map_data = _read(games_dir, replay_id, config.MATCH3D_FILENAME)
     assert map_data["replay_id"] == REPLAY_ID
     assert len(map_data["players"]) == 2
     assert len(map_data["ball"]["t"]) > 0
@@ -78,9 +78,9 @@ def test_upload_replay_nominal_events_reach_stats_json(client, games_dir, monkey
     assert (bob["boost"]["small_pads"], bob["boost"]["big_pads"]) == (1, 2)
 
 
-def test_upload_replay_nominal_map_json_track_has_rotation_columns(client, games_dir, mock_parse):
+def test_upload_replay_nominal_3dmatch_json_track_has_rotation_columns(client, games_dir, mock_parse):
     replay_id = _post(client).json()["id"]
-    track = _read(games_dir, replay_id, config.MAP_FILENAME)["players"][0]["track"]
+    track = _read(games_dir, replay_id, config.MATCH3D_FILENAME)["players"][0]["track"]
     n = len(track["t"])
     assert all(len(track[k]) == n for k in ("qx", "qy", "qz", "qw"))
     assert track["qw"][0] == 0.9274
@@ -190,7 +190,7 @@ def test_upload_replay_same_replay_twice_stores_one_folder_and_returns_same_id(c
     assert first.json()["id"] == second.json()["id"] == FOLDER_NAME
     assert [f.name for f in _files(games_dir)] == [FOLDER_NAME]
     assert not list(games_dir.glob(".tmp-*"))
-    assert sorted(f.name for f in (games_dir / FOLDER_NAME).iterdir()) == ["map.json", "stats.json"]
+    assert sorted(f.name for f in (games_dir / FOLDER_NAME).iterdir()) == ["3dmatch.json", "heatmap.json", "stats.json"]
 
 
 def test_upload_replay_duplicate_leaves_existing_stats_untouched(client, games_dir, mock_parse):
@@ -265,13 +265,13 @@ def test_upload_replay_stray_file_in_games_dir_is_ignored(client, games_dir, moc
     assert _post(client).json()["id"] == FOLDER_NAME
 
 
-def test_upload_replay_duplicate_detected_even_without_map_json(client, games_dir, mock_parse):
+def test_upload_replay_duplicate_detected_even_without_3dmatch_json(client, games_dir, mock_parse):
     folder = _post(client).json()["id"]
-    (games_dir / folder / config.MAP_FILENAME).unlink()
+    (games_dir / folder / config.MATCH3D_FILENAME).unlink()
 
     assert _post(client).json()["id"] == folder
     assert [f.name for f in _files(games_dir)] == [folder]
-    assert not (games_dir / folder / config.MAP_FILENAME).exists()
+    assert not (games_dir / folder / config.MATCH3D_FILENAME).exists()
 
 
 def test_upload_replay_same_replay_posted_concurrently_stores_one_folder(games_dir, mock_parse):
@@ -314,7 +314,7 @@ def test_upload_replay_write_failure_returns_500_and_leaves_nothing(client, game
     real_write = Path.write_text
 
     def failing(self, *args, **kwargs):
-        if self.name == config.MAP_FILENAME:
+        if self.name == config.MATCH3D_FILENAME:
             raise OSError("disk full")
         return real_write(self, *args, **kwargs)
 
@@ -323,15 +323,66 @@ def test_upload_replay_write_failure_returns_500_and_leaves_nothing(client, game
     assert _files(games_dir) == []
 
 
+def test_upload_replay_heatmap_json_matches_heatmaps_of_3dmatch_json(client, games_dir, mock_parse):
+    replay_id = _post(client).json()["id"]
+    match3d = _read(games_dir, replay_id, config.MATCH3D_FILENAME)
+    heatmap = _read(games_dir, replay_id, config.HEATMAP_FILENAME)
+    assert heatmap["replay_id"] == match3d["replay_id"] == REPLAY_ID
+    assert heatmap["players"] == [
+        {"name": p["name"], "team": p["team"], "heatmap": p["heatmap"]} for p in match3d["players"]
+    ]
+
+
+def test_upload_replay_3dmatch_json_keeps_heatmaps(client, games_dir, mock_parse):
+    replay_id = _post(client).json()["id"]
+    players = _read(games_dir, replay_id, config.MATCH3D_FILENAME)["players"]
+    assert all(len(p["heatmap"]["counts"]) == 20 for p in players)
+
+
+def test_upload_replay_heatmap_json_has_no_tracking_data(client, games_dir, mock_parse):
+    replay_id = _post(client).json()["id"]
+    heatmap = _read(games_dir, replay_id, config.HEATMAP_FILENAME)
+    assert all(set(p) == {"name", "team", "heatmap"} for p in heatmap["players"])
+    assert set(heatmap) == {"replay_id", "players", "ball"}
+
+
+def test_upload_replay_heatmap_write_failure_returns_500_and_leaves_nothing(client, games_dir, mock_parse, monkeypatch):
+    real_write = Path.write_text
+
+    def failing(self, *args, **kwargs):
+        if self.name == config.HEATMAP_FILENAME:
+            raise OSError("disk full")
+        return real_write(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing)
+    assert _post(client).status_code == 500
+    assert _files(games_dir) == []
+
+
+def test_write_match_folder_heatmap_write_failure_leaves_no_folder(games_dir, fake_raw, monkeypatch):
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "g.replay", fake_raw)
+    real_write = Path.write_text
+
+    def failing(self, *args, **kwargs):
+        if self.name == config.HEATMAP_FILENAME:
+            raise OSError("disk full")
+        return real_write(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", failing)
+    with pytest.raises(OSError):
+        storage._write_match_folder("Match", stats_file, map_file, heatmap_file)
+    assert _files(games_dir) == []
+
+
 def test_write_match_folder_rename_failure_removes_temp_folder(games_dir, fake_raw, monkeypatch):
-    stats_file, map_file = stats.build_match_files("abc", "g.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "g.replay", fake_raw)
 
     def failing(self, target):
         raise PermissionError("locked")
 
     monkeypatch.setattr(Path, "rename", failing)
     with pytest.raises(PermissionError):
-        storage._write_match_folder("Match", stats_file, map_file)
+        storage._write_match_folder("Match", stats_file, map_file, heatmap_file)
     assert _files(games_dir) == []
 
 
@@ -416,7 +467,7 @@ def test_upload_replay_real_replay_integration(client, games_dir):
     stats_data = _stats_of(games_dir, folder)
     assert len(stats_data["players"]) == expected
     assert all({"demolitions", "boost"} <= set(p) for p in stats_data["players"])
-    data = _read(games_dir, folder, config.MAP_FILENAME)
+    data = _read(games_dir, folder, config.MATCH3D_FILENAME)
     assert len(data["players"]) == expected
     n = len(data["ball"]["t"])
     assert n > 0

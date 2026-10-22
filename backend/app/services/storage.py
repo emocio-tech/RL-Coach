@@ -13,7 +13,8 @@ from starlette.concurrency import run_in_threadpool
 from app import config
 from app.schemas.replay import (
     GameReport,
-    MapFile,
+    HeatmapFile,
+    Match3DFile,
     MatchHeatmaps,
     MatchTracks,
     PlayerHeatmap,
@@ -80,8 +81,12 @@ def _store_match(
             existing = _find_existing_folder(replay_id)
             if existing is not None:
                 return existing.name, True
-        stats_file, map_file = stats.build_match_files(replay_id, original_filename, raw)
-        folder = _write_match_folder(_folder_name(properties, replay_id), stats_file, map_file)
+        stats_file, match3d_file, heatmap_file = stats.build_match_files(
+            replay_id, original_filename, raw
+        )
+        folder = _write_match_folder(
+            _folder_name(properties, replay_id), stats_file, match3d_file, heatmap_file
+        )
         return folder, False
 
 
@@ -124,7 +129,7 @@ def _folder_name(properties: dict, replay_id: str) -> str:
     return f"{map_name}_{match_type}{size_part}_{_sanitize(replay_id, 'replay')}"
 
 
-def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
+def _write_match_folder(folder_name: str, stats_file, match3d_file, heatmap_file) -> str:
     config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
     games_dir = config.GAMES_DIR.resolve()
     tmp = config.GAMES_DIR / f".tmp-{uuid.uuid4().hex}"
@@ -133,8 +138,11 @@ def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
         (tmp / config.STATS_FILENAME).write_text(
             stats_file.model_dump_json(), encoding="utf-8"
         )
-        (tmp / config.MAP_FILENAME).write_text(
-            map_file.model_dump_json(), encoding="utf-8"
+        (tmp / config.MATCH3D_FILENAME).write_text(
+            match3d_file.model_dump_json(), encoding="utf-8"
+        )
+        (tmp / config.HEATMAP_FILENAME).write_text(
+            heatmap_file.model_dump_json(), encoding="utf-8"
         )
         for attempt in range(1, 1001):
             candidate = folder_name if attempt == 1 else f"{folder_name}_{attempt}"
@@ -156,7 +164,7 @@ def get_player_heatmap(game_id: str, player_name: str) -> PlayerHeatmap | None:
     """Heatmap of one player (name compared ignoring case and surrounding spaces), or None if unavailable.
 
     It is the very heatmap the Heatmaps page shows: it goes through `get_game_heatmaps`, so the chat and the page
-    can never differ (dead-ball samples left out, old map.json files recomputed).
+    can never differ (dead-ball samples left out).
     """
     heatmaps = get_game_heatmaps(game_id)
     if heatmaps is None:
@@ -193,17 +201,17 @@ def list_games() -> list[ReplaySummary]:
 
 
 def get_game_tracks(game_id: str) -> MatchTracks | None:
-    """Tracks of every player and of the ball, or None if the game or its map.json is missing."""
+    """Tracks of every player and of the ball, or None if the game or its 3dmatch.json is missing."""
     if not GAME_ID_PATTERN.fullmatch(game_id):
         return None
     folder = config.GAMES_DIR / game_id
     stats_path = folder / config.STATS_FILENAME
-    map_path = folder / config.MAP_FILENAME
+    map_path = folder / config.MATCH3D_FILENAME
     if not stats_path.is_file() or not map_path.is_file():
         return None
     try:
         stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
-        map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+        map_file = Match3DFile.model_validate_json(map_path.read_text(encoding="utf-8"))
     except ValueError:
         # Game imported before the orientations were extracted: no usable tracking data.
         return None
@@ -243,39 +251,20 @@ def iter_game_reports(team_size: int | None = None) -> Iterator[tuple[str, GameR
 
 
 def get_game_heatmaps(game_id: str) -> MatchHeatmaps | None:
-    """Heatmaps of every player and of the ball (read from map.json), or None if unavailable.
+    """Heatmaps of every player and of the ball (read from heatmap.json), or None if unavailable.
 
-    The import step stores them, without the dead-ball samples. An older map.json has no stored ball
-    heatmap (and its player heatmaps still count the dead-ball samples): every heatmap is then recomputed
-    from the tracks on each call.
+    The import step stores them without the dead-ball samples; 3dmatch.json is never read.
     """
     if not GAME_ID_PATTERN.fullmatch(game_id):
         return None
-    map_path = config.GAMES_DIR / game_id / config.MAP_FILENAME
-    if not map_path.is_file():
+    heatmap_path = config.GAMES_DIR / game_id / config.HEATMAP_FILENAME
+    if not heatmap_path.is_file():
         return None
     try:
-        map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+        heatmap_file = HeatmapFile.model_validate_json(heatmap_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    ball = map_file.ball
-    if map_file.ball_heatmap is not None:
-        return MatchHeatmaps(
-            players=[PlayerHeatmap(name=p.name, team=p.team, heatmap=p.heatmap) for p in map_file.players],
-            ball=map_file.ball_heatmap,
-        )
-    dead_ball = stats.dead_ball_mask(ball.x, ball.y, ball.z)
-    return MatchHeatmaps(
-        players=[
-            PlayerHeatmap(
-                name=p.name,
-                team=p.team,
-                heatmap=stats.heatmap_from_points(p.track.x, p.track.y, skip=dead_ball),
-            )
-            for p in map_file.players
-        ],
-        ball=stats.heatmap_from_points(ball.x, ball.y, skip=dead_ball),
-    )
+    return MatchHeatmaps(players=heatmap_file.players, ball=heatmap_file.ball)
 
 
 def get_game_report(game_id: str) -> GameReport | None:
@@ -287,9 +276,9 @@ def get_game_report(game_id: str) -> GameReport | None:
         return None
     stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
     stats_file.match.map_name = maps.display_name(stats_file.match.map_name)
-    map_path = folder / config.MAP_FILENAME
+    map_path = folder / config.MATCH3D_FILENAME
     map_file = (
-        MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+        Match3DFile.model_validate_json(map_path.read_text(encoding="utf-8"))
         if map_path.is_file()
         else None
     )

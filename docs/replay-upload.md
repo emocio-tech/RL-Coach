@@ -1,7 +1,7 @@
 # Import d'un replay vers un dossier de JSON
 
 ## Résumé fonctionnel
-L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket`, puis écrit dans `data/games/` un dossier propre au match. Son nom reprend le stade, le mode de jeu et l'id du replay. Ce dossier contient deux fichiers : `stats.json` (infos du match, stats de chaque joueur, démolitions, boost) et `map.json` (heatmap, trajectoires des joueurs et de la balle à 5 Hz). Pour chaque joueur, la trajectoire contient la position, la vitesse, le boost et l'orientation de la voiture (quaternion). Le `.replay` d'origine n'est jamais conservé. La réponse contient le nom du dossier final, qui sert d'identifiant. Pour l'instant, le front affiche seulement cet identifiant.
+L'utilisateur envoie un fichier `.replay` de Rocket League depuis l'interface. Le back le décode avec l'outil externe `rrrocket`, puis écrit dans `data/games/` un dossier propre au match. Son nom reprend le stade, le mode de jeu et l'id du replay. Ce dossier contient trois fichiers : `stats.json` (infos du match, stats de chaque joueur, démolitions, boost), `3dmatch.json` (heatmap, trajectoires des joueurs et de la balle à 5 Hz). Pour chaque joueur, la trajectoire contient la position, la vitesse, le boost et l'orientation de la voiture (quaternion), et `heatmap.json` (uniquement les heatmaps des joueurs, lu par le coach pour afficher une heatmap sans charger les trajectoires). Le `.replay` d'origine n'est jamais conservé. La réponse contient le nom du dossier final, qui sert d'identifiant. Pour l'instant, le front affiche seulement cet identifiant.
 
 ### Exemple concret
 ```bash
@@ -11,7 +11,7 @@ Réponse `201` (le replay est un 2v2 en ligne sur le stade `UF_Day_P`) :
 ```json
 {"id": "UF_Day_P_Online-2v2_900DE226..."}
 ```
-Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient `stats.json` et `map.json`. Les valeurs ci-dessous sont illustratives et tronquées.
+Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient `stats.json`, `3dmatch.json` et `heatmap.json`. Les valeurs ci-dessous sont illustratives et tronquées.
 
 `stats.json` :
 ```json
@@ -31,7 +31,7 @@ Le dossier `data/games/UF_Day_P_Online-2v2_900DE226...` est créé. Il contient 
 }
 ```
 
-`map.json` :
+`3dmatch.json` :
 ```json
 {
   "replay_id": "900DE226...",
@@ -62,7 +62,7 @@ Si l'on réimporte le même replay, rien n'est écrit : la réponse `201` renvoi
 
 ### Sorties
 - Réponse `201` : `{"id": "<nom du dossier>"}` (`UploadResult`). Pour un replay déjà importé, c'est le nom du dossier existant et rien n'est écrit (voir « Déduplication »). Pour un nouveau replay, le nom peut porter un suffixe `_N` si un autre match occupe déjà ce nom (voir ci-dessous).
-- Dossier `data/games/<nom>/` (`GAMES_DIR`) contenant `stats.json` (`STATS_FILENAME`) et `map.json` (`MAP_FILENAME`). Le dossier `games` est créé à la volée.
+- Dossier `data/games/<nom>/` (`GAMES_DIR`) contenant `stats.json` (`STATS_FILENAME`), `3dmatch.json` (`MATCH3D_FILENAME`) et `heatmap.json` (`HEATMAP_FILENAME`). Le dossier `games` est créé à la volée.
 - Écriture atomique : les deux fichiers sont d'abord écrits dans un dossier temporaire `data/games/.tmp-<uuid>`, puis ce dossier est renommé en nom final. En cas d'échec, le dossier temporaire est supprimé.
 - Le `.replay` est copié dans un fichier temporaire de l'OS pour `rrrocket` (`rrrocket -n <fichier>`, timeout 60 s), supprimé ensuite. Il n'est jamais écrit dans `data/`.
 
@@ -86,7 +86,7 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 - **Clé** : `properties["Id"]` du replay, comparé au `replay_id` brut de `stats.json` (non nettoyé).
 - **Replay déjà présent** : `_find_existing_folder` renvoie le dossier trouvé. La route répond `201` avec son nom, sans créer de dossier ni toucher à `stats.json` (la date d'import, mtime de `stats.json`, reste inchangée). `rrrocket` a quand même été exécuté, car le parsing a lieu avant la recherche.
 - **Recherche** : sur le disque, dans l'ordre alphabétique des noms de dossier : le dossier sans suffixe passe avant `_2`, `_3`. Les dossiers `.tmp-*`, les fichiers et les dossiers sans `stats.json` lisible ou valide sont ignorés.
-- **`map.json` manquant** : n'empêche pas la détection du doublon, seul `stats.json` compte.
+- **`3dmatch.json` manquant** : n'empêche pas la détection du doublon, seul `stats.json` compte.
 - **Replay sans `Id`** (`uuid4` généré) : jamais dédupliqué, chaque envoi crée un dossier.
 - **Concurrence** : le verrou est en mémoire, il protège les imports simultanés d'un même processus uniquement.
 
@@ -120,7 +120,7 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
   - C'est le niveau de boost, en % du réservoir (0 à 100), pondéré par le temps (`delta` des frames) sur les périodes où il est connu.
   - Il est arrondi à 0,1 et vaut `null` si aucune période n'est connue.
 
-### Contenu de `map.json` (`MapFile`)
+### Contenu de `3dmatch.json` (`Match3DFile`)
 - `replay_id`.
 - `players[]` : `name`, `team`, `heatmap`, `track`.
   - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon de 0,2 s. Les positions hors bornes sont ramenées dans la cellule de bord. Les échantillons où le ballon est immobile depuis au moins 2 s (compte à rebours de l'engagement, ballon figé dans la cage après un but) ne sont pas comptés ; les `track` gardent tous les échantillons.
@@ -137,7 +137,7 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
   - `boost` est un entier de 0 à 100.
   - `qx`, `qy`, `qz`, `qw` sont des composantes de quaternion sans unité, arrondies à 4 décimales.
 - **Taille indicative** : environ 0,4 Mo pour un 2v2 de 4 min (mesuré à 0,43 Mo sur un replay de 227 s).
-- Les positions et orientations des joueurs ne figurent que dans `map.json`.
+- Les positions et orientations des joueurs ne figurent que dans `3dmatch.json`.
 
 ### Erreurs
 | Condition | Résultat |
@@ -154,11 +154,11 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 Dans tous les cas d'erreur, aucun dossier définitif n'est laissé : le dossier temporaire est supprimé.
 
 ### Configuration
-`RRROCKET_PATH` (variable d'environnement) surcharge `backend/bin/rrrocket.exe`. Installation : voir `README.md`. Les autres constantes sont dans `backend/app/config.py` : `GAMES_DIR`, `STATS_FILENAME`, `MAP_FILENAME`, `FRAME_SAMPLE_HZ`, `RRROCKET_TIMEOUT_SECONDS`.
+`RRROCKET_PATH` (variable d'environnement) surcharge `backend/bin/rrrocket.exe`. Installation : voir `README.md`. Les autres constantes sont dans `backend/app/config.py` : `GAMES_DIR`, `STATS_FILENAME`, `MATCH3D_FILENAME`, `HEATMAP_FILENAME`, `FRAME_SAMPLE_HZ`, `RRROCKET_TIMEOUT_SECONDS`.
 
 ### Périmètre et limites
 - **Inclus** :
-  - Import d'un `.replay` vers un dossier `stats.json` + `map.json`.
+  - Import d'un `.replay` vers un dossier `stats.json` + `3dmatch.json` + `heatmap.json`.
   - Nommage du dossier avec gestion des collisions.
   - Déduplication des réimports par `Id` de replay.
   - Stats de base, démolitions, boost, heatmap, trajectoires (position, vitesse, boost, orientation) et balle.

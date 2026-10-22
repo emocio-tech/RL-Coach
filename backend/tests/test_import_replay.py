@@ -47,7 +47,7 @@ def _stats_of(games_dir, folder):
 def test_import_replay_nominal_returns_game_id_and_writes_files(games_dir, mock_parse, replay_file):
     result = coach.import_replay(str(replay_file))
     assert result == {"game_id": FOLDER_NAME, "already_imported": False}
-    assert sorted(f.name for f in (games_dir / FOLDER_NAME).iterdir()) == ["map.json", "stats.json"]
+    assert sorted(f.name for f in (games_dir / FOLDER_NAME).iterdir()) == ["3dmatch.json", "heatmap.json", "stats.json"]
     assert mock_parse == [CONTENT]
 
 
@@ -212,8 +212,9 @@ def test_import_replay_stores_only_basename_not_full_path(games_dir, mock_parse,
     assert json.loads(text)["original_filename"] == "game.replay"
     assert str(replay_file.parent) not in text
     assert str(replay_file.parent).replace("\\", "\\\\") not in text
-    map_text = (games_dir / FOLDER_NAME / config.MAP_FILENAME).read_text(encoding="utf-8")
-    assert str(replay_file.parent) not in map_text
+    for filename in (config.MATCH3D_FILENAME, config.HEATMAP_FILENAME):
+        file_text = (games_dir / FOLDER_NAME / filename).read_text(encoding="utf-8")
+        assert str(replay_file.parent) not in file_text
 
 
 def test_import_replay_stats_replay_id_matches_replay(games_dir, mock_parse, replay_file):

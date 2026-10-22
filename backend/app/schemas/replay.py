@@ -117,13 +117,24 @@ class PadTrack(BaseModel):
     pickups: list[PadPickup]
 
 
-class MapFile(BaseModel):
+class Match3DFile(BaseModel):
     replay_id: str
     players: list[PlayerMap]
     ball: BallTrack
-    ball_heatmap: Heatmap | None = None  # absent from files imported before it existed: recomputed from `ball` on read
     timeline_seconds: float | None = None
     pads: list[PadTrack] = []
+
+
+class PlayerHeatmap(BaseModel):
+    name: str
+    team: int
+    heatmap: Heatmap
+
+
+class HeatmapFile(BaseModel):
+    replay_id: str
+    players: list[PlayerHeatmap]
+    ball: Heatmap
 
 
 class PlayerTrackSet(BaseModel):
@@ -131,12 +142,6 @@ class PlayerTrackSet(BaseModel):
     team: int
     car: str | None = None
     track: PlayerTrack
-
-
-class PlayerHeatmap(BaseModel):
-    name: str
-    team: int
-    heatmap: Heatmap
 
 
 class MatchHeatmaps(BaseModel):

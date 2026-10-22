@@ -156,13 +156,13 @@ def test_locate_pads_is_a_global_assignment_not_a_greedy_one():
 def test_old_map_json_without_pads_is_still_readable(games_dir, fake_raw):
     _park(fake_raw, 10, CAR_B, 0.0, -4200.0)
     pickup(fake_raw, 10, PAD_SMALL, CAR_B)
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
     old_map = json.loads(map_file.model_dump_json())
     del old_map["pads"]
-    (folder / config.MAP_FILENAME).write_text(json.dumps(old_map), encoding="utf-8")
+    (folder / config.MATCH3D_FILENAME).write_text(json.dumps(old_map), encoding="utf-8")
 
     tracks = storage.get_game_tracks(GAME_ID)
 
@@ -173,11 +173,12 @@ def test_old_map_json_without_pads_is_still_readable(games_dir, fake_raw):
 def test_tracks_expose_the_pads_of_the_map(games_dir, fake_raw):
     _park(fake_raw, 10, CAR_B, 0.0, -4200.0)
     pickup(fake_raw, 10, PAD_SMALL, CAR_B)
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
-    (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+    (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
 
     tracks = storage.get_game_tracks(GAME_ID)
 

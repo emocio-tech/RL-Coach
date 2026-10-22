@@ -10,7 +10,8 @@ LOGS_DIR = ROOT_DIR / "logs"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 ALLOWED_EXTENSION = ".replay"
 STATS_FILENAME = "stats.json"
-MAP_FILENAME = "map.json"
+MATCH3D_FILENAME = "3dmatch.json"
+HEATMAP_FILENAME = "heatmap.json"
 FRAME_SAMPLE_HZ = 5
 RRROCKET_PATH = Path(
     os.environ.get("RRROCKET_PATH", ROOT_DIR / "backend" / "bin" / "rrrocket.exe")

@@ -4,7 +4,7 @@ from app import config
 from app.schemas.replay import (
     BallTrack,
     GameReport,
-    MapFile,
+    Match3DFile,
     PlayerDetail,
     PlayerMap,
     PlayerReport,
@@ -18,7 +18,7 @@ ZONE_LIMIT = FIELD_HALF_LENGTH / 3
 SAMPLE_SECONDS = 1 / config.FRAME_SAMPLE_HZ
 
 
-def build_report(game_id: str, stats_file: StatsFile, map_file: MapFile | None) -> GameReport:
+def build_report(game_id: str, stats_file: StatsFile, map_file: Match3DFile | None) -> GameReport:
     """Merge the match stats with positioning stats computed from the tracks."""
     maps = {p.name: p for p in map_file.players} if map_file else {}
     details = _positioning(map_file) if map_file else {}
@@ -48,7 +48,7 @@ def _avg(values: list[float]) -> float | None:
     return round(sum(values) / len(values), 1) if values else None
 
 
-def _positioning(map_file: MapFile) -> dict[str, PlayerDetail]:
+def _positioning(map_file: Match3DFile) -> dict[str, PlayerDetail]:
     players = map_file.players
     ball = map_file.ball
     n_samples = len(ball.t)

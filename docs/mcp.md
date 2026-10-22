@@ -17,7 +17,7 @@ Transport **stdio** : l'agent lance le serveur comme sous-processus et dialogue 
 cd backend
 .venv\Scripts\python.exe -m app.mcp_server
 ```
-Le dossier de travail doit être `backend/` (import `app`). Le serveur lit `data/games/` via `services/storage`. Seul `import_replay` y écrit (un dossier `stats.json` + `map.json` par nouvelle partie). Aucun `print` : stdout est réservé au protocole.
+Le dossier de travail doit être `backend/` (import `app`). Le serveur lit `data/games/` via `services/storage`. Seul `import_replay` y écrit (un dossier `stats.json` + `3dmatch.json` + `heatmap.json` par nouvelle partie). Aucun `print` : stdout est réservé au protocole.
 
 ### Outils
 Le serveur expose 8 outils. Chacun renvoie un objet JSON ; une erreur est un objet `{"error": ...}` (partie ou joueur introuvable, argument invalide, fichier refusé), pas une exception. Sauf `import_replay`, ils réutilisent les outils du coach IA (`services/coach.py`), avec `game_id` en argument. `import_replay` appelle la fonction `coach.import_replay`, absente de la liste `TOOLS` du chat.

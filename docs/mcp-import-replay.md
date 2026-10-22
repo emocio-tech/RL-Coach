@@ -13,7 +13,7 @@ Contexte : `data/games/` est vide. L'utilisateur demande dans Claude Code : « A
    ```json
    {"game_id": "UF_Day_P_Online-2v2_900DE226...", "already_imported": false}
    ```
-   Le dossier `data/games/UF_Day_P_Online-2v2_900DE226.../` contient `stats.json` et `map.json`. Le `.replay` d'origine n'est ni copié, ni déplacé, ni modifié.
+   Le dossier `data/games/UF_Day_P_Online-2v2_900DE226.../` contient `stats.json`, `3dmatch.json` et `heatmap.json`. Le `.replay` d'origine n'est ni copié, ni déplacé, ni modifié.
 5. L'agent appelle `get_match_summary` avec ce `game_id` et commente le score, la durée et les stats des joueurs.
 
 Cas déjà importé : l'utilisateur redonne le même fichier plus tard. L'outil renvoie le même `game_id` avec `"already_imported": true`. Aucun fichier n'est écrit : le dossier et sa date d'import restent inchangés. L'agent peut enchaîner directement sur `get_match_summary`.
@@ -33,7 +33,7 @@ Outil MCP `import_replay(file_path: str)` (`backend/app/mcp_server.py:36-41`), q
 - Succès : `{"game_id": "<nom du dossier>", "already_imported": <bool>}` (`backend/app/services/coach.py:306`).
   - `game_id` : nom du dossier dans `data/games/`, au format `<stade>_<mode>-<N>v<N>_<id replay>` avec un éventuel suffixe `_N` (même nommage que l'import web, voir `docs/replay-upload.md`).
   - `already_imported` : `true` si un dossier contient déjà ce replay (même `Id`) ; dans ce cas rien n'est écrit.
-- Effets (nouvelle partie) : création de `data/games/<game_id>/stats.json` et `map.json`, par écriture atomique via un dossier temporaire `.tmp-<uuid>` renommé (`backend/app/services/storage.py:125-151`).
+- Effets (nouvelle partie) : création de `data/games/<game_id>/stats.json` et `3dmatch.json`, par écriture atomique via un dossier temporaire `.tmp-<uuid>` renommé (`backend/app/services/storage.py:130-159`).
 - Échec : `{"error": "<message>"}`. L'outil ne lève pas d'exception vers l'agent.
 
 ### Erreurs

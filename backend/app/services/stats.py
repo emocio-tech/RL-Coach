@@ -7,11 +7,13 @@ from app.schemas.replay import (
     MatchStats,
     BoostStats,
     Demolitions,
-    MapFile,
+    HeatmapFile,
+    Match3DFile,
     MatchEvent,
     PadPickup,
     PadTrack,
     PlayerFullStats,
+    PlayerHeatmap,
     PlayerMap,
     PlayerStats,
     PlayerTrack,
@@ -446,7 +448,7 @@ def _actor_id(value):
 
 def build_match_files(
     replay_id: str, original_filename: str, raw: dict
-) -> tuple[StatsFile, MapFile]:
+) -> tuple[StatsFile, Match3DFile, HeatmapFile]:
     properties = raw.get("properties") or {}
     player_stats = properties.get("PlayerStats") or []
     frames = ((raw.get("network_frames") or {}).get("frames")) or []
@@ -641,12 +643,16 @@ def build_match_files(
         players=full_players,
         events=events,
     )
-    map_file = MapFile(
+    match3d_file = Match3DFile(
         replay_id=replay_id,
         players=players,
         ball=ball,
-        ball_heatmap=heatmap_from_points(ball.x, ball.y, skip=dead_ball),
         timeline_seconds=timeline_seconds,
         pads=pad_tracks,
     )
-    return stats_file, map_file
+    heatmap_file = HeatmapFile(
+        replay_id=replay_id,
+        players=[PlayerHeatmap(name=p.name, team=p.team, heatmap=p.heatmap) for p in players],
+        ball=heatmap_from_points(ball.x, ball.y, skip=dead_ball),
+    )
+    return stats_file, match3d_file, heatmap_file

@@ -99,7 +99,7 @@ def test_log_call_lists_tools_and_files_used(llm, game, logs_dir):
     log = _read_log(logs_dir)
     assert log.count("=== ") == 2
     assert "outil get_match_summary({})" in log
-    assert f"data/games/{GAME_ID}/stats.json, data/games/{GAME_ID}/map.json" in log
+    assert f"data/games/{GAME_ID}/stats.json, data/games/{GAME_ID}/3dmatch.json" in log
     assert "résultats_outils=0" in log.split("=== ")[1]
     assert "résultats_outils=0" not in log.split("=== ")[2]
 
