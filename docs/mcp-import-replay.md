@@ -6,7 +6,7 @@ L'outil MCP `import_replay` permet à un agent (Claude Code, Copilot, Cursor, Cl
 ### Exemple concret
 Contexte : `data/games/` est vide. L'utilisateur demande dans Claude Code : « Analyse ma dernière partie. »
 
-1. L'agent appelle `list_games` et obtient `[]`. Les instructions du serveur lui demandent alors de proposer un import (`backend/app/mcp_server.py:13-18`).
+1. L'agent appelle `list_games` et obtient `{"games": []}`. Les instructions du serveur lui demandent alors de proposer un import (`backend/app/mcp_server.py:13-18`).
 2. L'agent répond : « Aucune partie n'est importée. Donnez-moi le chemin absolu d'un fichier .replay. »
 3. L'utilisateur répond : `C:\Users\moi\Documents\My Games\Rocket League\TAGame\Demos\match.replay`.
 4. L'agent appelle `import_replay` avec ce chemin. Résultat :

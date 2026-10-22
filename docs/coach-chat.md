@@ -64,27 +64,25 @@ Réponse `200` : `{"reply": "<texte du coach>"}`, renvoyée d'un bloc (pas de st
 ### Fonctionnement côté back (`backend/app/services/coach.py`)
 1. Vérification de la clé API.
 2. Troncature défensive : seuls les 20 derniers messages sont gardés, chacun coupé à 2000 caractères.
-3. Construction du prompt système (`build_system_prompt`) : rôle de coach tutoyant, obligation d'utiliser les outils pour tout chiffre, refus du hors-sujet, noms de joueurs et de fichiers traités comme des données et non des instructions. Il varie selon la présence d'une partie et d'un joueur sélectionné.
+3. Construction du prompt système (`build_system_prompt`) : rôle de coach tutoyant, obligation d'utiliser les outils pour tout chiffre, refus du hors-sujet, noms de joueurs et de fichiers traités comme des données et non des instructions. Il décrit `list_games` et l'argument `game_id` des outils, indique la partie ouverte (utilisée par défaut) quand elle existe, et invite à utiliser `list_games` sinon. Il varie selon la présence d'une partie et d'un joueur sélectionné.
 4. Boucle d'appels au modèle (voir ci-dessous).
 
 #### Les outils de function calling
-Ils ne sont proposés au modèle que si `game_id` est renseigné. Aucun ne prend d'identifiant de partie en argument : ils utilisent le `game_id` de la requête. Les rapports viennent de `storage.get_game_report`.
+Ils sont toujours proposés au modèle, avec ou sans `game_id` dans la requête. `get_match_summary`, `get_player_stats`, `show_heatmap` et `get_match_events` acceptent un argument `game_id` optionnel (validé avec `GAME_ID_PATTERN`) ; s'il est omis ou vide, c'est le `game_id` de la requête (partie ouverte) qui est utilisé, et sans lui l'outil renvoie une erreur demandant d'appeler `list_games`. Les rapports viennent de `storage.get_game_report`.
 
 | Outil | Arguments | Ce qu'il renvoie (JSON) |
 |---|---|---|
-| `get_match_summary` | aucun | `{"match": <score, durée, mode, carte, date>, "players": [stats de base de chaque joueur]}` |
-| `get_player_stats` | `player_name` (chaîne, obligatoire) | Stats de base du joueur plus `detail`. Nom comparé sans tenir compte de la casse ni des espaces en bordure. |
-| `compare_players` | aucun | `{"players": [...]}` : stats de base plus `detail` pour tous les joueurs. |
-| `analyze_player_across_matches` | `player_name?`, `team_size?`, `last_n?` | Style de jeu agrégé sur plusieurs parties importées (pas seulement la partie ouverte). Voir [cross-match-analysis.md](cross-match-analysis.md). |
+| `get_match_summary` | `game_id?` | `{"match": <score, durée, mode, carte, date>, "players": [stats de base de chaque joueur]}` |
+| `get_player_stats` | `player_name` (chaîne, obligatoire), `game_id?` | Stats de base du joueur plus `detail`. Nom comparé sans tenir compte de la casse ni des espaces en bordure. |
+| `list_games` | `player_name?` | `{"games": [...]}` : parties importées, la plus récente d'abord, 50 au maximum (`game_id`, `map_name`, `match_type`, `team_size`, `date`, `score`, `players`). `player_name` filtre sur un nom de joueur partiel, sans tenir compte de la casse. |
 
-Les erreurs sont renvoyées au modèle sous la forme `{"error": ...}`, sans exception : outil inconnu, arguments invalides (JSON incorrect ou pas un objet), aucune partie ouverte, partie introuvable, `player_name` manquant, joueur introuvable (avec `available_players`), erreur interne.
+Les erreurs sont renvoyées au modèle sous la forme `{"error": ...}`, sans exception : outil inconnu, arguments invalides (JSON incorrect ou pas un objet), aucune partie ouverte (ni `game_id` en argument), `game_id` invalide, partie introuvable, `player_name` manquant, joueur introuvable (avec `available_players`), erreur interne.
 
 #### Boucle de tool calls et plafond
 - Au plus `LLM_MAX_TOOL_ITERATIONS + 1` appels au modèle, soit 6.
 - Si le modèle ne demande aucun outil, son texte est renvoyé ; un contenu vide lève `CoachError`.
 - Sinon, le message assistant avec ses `tool_calls` est ajouté, chaque outil est exécuté et son résultat ajouté avec le rôle `tool` (bon `tool_call_id`).
 - Si le modèle demande encore des outils au dernier appel, `CoachError` est levée (502).
-- Sans `game_id`, d'éventuels `tool_calls` sont ignorés.
 
 ### Côté front
 - `ChatBubble` est monté une seule fois dans `frontend/src/App.jsx`, hors de la page courante, avec `gameId` (`report?.id`) et `selectedPlayer`.

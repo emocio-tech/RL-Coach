@@ -20,18 +20,16 @@ cd backend
 Le dossier de travail doit être `backend/` (import `app`). Le serveur lit `data/games/` via `services/storage`. Seul `import_replay` y écrit (un dossier `stats.json` + `3dmatch.json` + `heatmap.json` par nouvelle partie). Aucun `print` : stdout est réservé au protocole.
 
 ### Outils
-Le serveur expose 8 outils. Chacun renvoie un objet JSON ; une erreur est un objet `{"error": ...}` (partie ou joueur introuvable, argument invalide, fichier refusé), pas une exception. Sauf `import_replay`, ils réutilisent les outils du coach IA (`services/coach.py`), avec `game_id` en argument. `import_replay` appelle la fonction `coach.import_replay`, absente de la liste `TOOLS` du chat.
+Le serveur expose 7 outils. Chacun renvoie un objet JSON ; une erreur est un objet `{"error": ...}` (partie ou joueur introuvable, argument invalide, fichier refusé), pas une exception. Sauf `import_replay`, ils réutilisent les outils du coach IA (`services/coach.py`), avec `game_id` en argument. `import_replay` appelle la fonction `coach.import_replay`, absente de la liste `TOOLS` du chat.
 
 | Outil | Arguments | Résultat |
 |---|---|---|
-| `list_games` | aucun | Parties importées, la plus récente d'abord (`id`, `original_filename`, `imported_at`, scores, `map_name`). |
+| `list_games` | `player_name?` | `{"games": [...]}` : parties importées, la plus récente d'abord, 50 au maximum (`game_id`, `map_name`, `match_type`, `team_size`, `date`, `score`, `players`). `player_name` filtre les parties dont un joueur a un nom contenant ce texte (casse ignorée). |
 | `import_replay` | `file_path` (chemin absolu) | Importe un `.replay` local (50 Mo max, ni UNC ni lien symbolique) : `{"game_id", "already_imported"}`, ou `{"error": ...}`. Voir `docs/mcp-import-replay.md`. |
 | `get_match_summary` | `game_id` | Score, durée, mode, carte, stats de base de chaque joueur. |
 | `get_player_stats` | `game_id`, `player_name` | Stats complètes d'un joueur (nom comparé sans tenir compte de la casse). |
-| `compare_players` | `game_id` | Stats complètes de tous les joueurs. |
 | `get_match_events` | `game_id`, `player_name?`, `event_type?` | Événements horodatés (mm:ss depuis le début du replay), 60 au maximum. `event_type` : `goal`, `assist`, `shot`, `save`, `demo_done`, `demo_taken`. |
 | `get_player_heatmap` | `game_id`, `player_name` | Temps passé en zone défensive, milieu, offensive (%). |
-| `analyze_player_across_matches` | `player_name`, `team_size?`, `last_n?` (1 à 20, défaut 20) | Style de jeu d'un joueur agrégé sur plusieurs parties (totaux, moyennes, par partie, tendance). Voir [cross-match-analysis.md](cross-match-analysis.md). |
 | `suggest_training` | `focus_areas` (1 à 3) | Entraînements (3 au maximum). Axes : `boost`, `positioning`, `rotation`, `defense`, `shooting`, `speed`, `aerials`, `ball_control`. |
 
 ### Brancher un agent

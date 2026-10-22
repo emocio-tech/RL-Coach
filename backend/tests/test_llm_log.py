@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -136,3 +137,74 @@ def test_game_files_ignores_missing_map(games_dir):
     (folder / config.STATS_FILENAME).write_text("{}", encoding="utf-8")
 
     assert llm_log.game_files("get_player_stats", "g") == ["data/games/g/stats.json"]
+
+
+def _stats_only_game(games_dir, name):
+    folder = games_dir / name
+    folder.mkdir(parents=True)
+    (folder / config.STATS_FILENAME).write_text("{}", encoding="utf-8")
+
+
+def test_game_files_uses_game_id_of_arguments(games_dir):
+    _stats_only_game(games_dir, "g_open")
+    _stats_only_game(games_dir, "g_arg")
+
+    files = llm_log.game_files("get_match_summary", "g_open", '{"game_id": "g_arg"}')
+
+    assert files == ["data/games/g_arg/stats.json"]
+
+
+@pytest.mark.parametrize(
+    "arguments", [None, "", "{}", '{"game_id": ""}', '{"game_id": null}', '{"game_id": 42}', "{bad json", "[]"]
+)
+def test_game_files_falls_back_to_request_game_id(games_dir, arguments):
+    _stats_only_game(games_dir, "g_open")
+
+    assert llm_log.game_files("get_match_summary", "g_open", arguments) == ["data/games/g_open/stats.json"]
+
+
+@pytest.mark.parametrize("bad_id", ["../x", "a/b", "..", ".hidden"])
+def test_game_files_invalid_argument_game_id_gives_no_file(games_dir, bad_id):
+    _stats_only_game(games_dir, "g_open")
+
+    assert llm_log.game_files("get_match_summary", "g_open", json.dumps({"game_id": bad_id})) == []
+
+
+def test_game_files_invalid_request_game_id_gives_no_file(games_dir):
+    assert llm_log.game_files("get_match_summary", "../x") == []
+
+
+def test_game_files_without_any_game_id_gives_no_file(games_dir):
+    assert llm_log.game_files("get_match_summary", None) == []
+
+
+def test_game_files_unknown_game_gives_no_file(games_dir):
+    assert llm_log.game_files("get_match_summary", None, '{"game_id": "missing"}') == []
+
+
+def test_game_files_list_games_reads_no_file(game):
+    assert llm_log.game_files("list_games", game, json.dumps({"game_id": game})) == []
+
+
+def test_log_call_list_games_without_files(llm, game, logs_dir):
+    llm([
+        _response(tool_calls=[_tool_call("c1", "list_games")]),
+        _response(content="ok"),
+    ])
+
+    coach.chat([ChatMessage(role="user", content="Mes parties")], None, None)
+
+    log = _read_log(logs_dir)
+    assert "outil list_games" in log
+    assert "fichiers lus : aucun" in log
+
+
+def test_log_call_uses_game_id_argument_without_open_game(llm, game, logs_dir):
+    llm([
+        _response(tool_calls=[_tool_call("c1", "get_match_summary", json.dumps({"game_id": game}))]),
+        _response(content="ok"),
+    ])
+
+    coach.chat([ChatMessage(role="user", content="Résume")], None, None)
+
+    assert f"data/games/{game}/stats.json" in _read_log(logs_dir)

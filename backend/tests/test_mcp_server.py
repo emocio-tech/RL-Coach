@@ -1,14 +1,11 @@
 import asyncio
 import json
-import shutil
 
 import pytest
 
 from app import config
 from app.mcp_server import (
-    analyze_player_across_matches,
     INSTRUCTIONS,
-    compare_players,
     get_match_events,
     get_match_summary,
     get_player_heatmap,
@@ -35,23 +32,21 @@ def game(games_dir, fake_raw):
     return GAME_ID
 
 
-def test_server_exposes_the_eight_tools():
+def test_server_exposes_the_seven_tools():
     tools = asyncio.run(mcp.list_tools())
     assert {tool.name for tool in tools} == {
         "list_games",
         "import_replay",
         "get_match_summary",
         "get_player_stats",
-        "compare_players",
         "get_match_events",
         "get_player_heatmap",
         "suggest_training",
-        "analyze_player_across_matches",
     }
 
 
 def test_list_games_empty_without_import(games_dir):
-    assert list_games() == []
+    assert list_games() == {"games": []}
 
 
 def test_list_games_description_mentions_import_replay():
@@ -78,7 +73,7 @@ def test_import_replay_tool_imports_file_via_server(games_dir, fake_raw, monkeyp
 
     assert not result.is_error
     assert json.loads(result.content[0].text) == {"game_id": FOLDER_NAME, "already_imported": False}
-    assert [g["id"] for g in list_games()] == [FOLDER_NAME]
+    assert [g["game_id"] for g in list_games()["games"]] == [FOLDER_NAME]
     assert source.read_bytes() == b"REPLAYDATA"
 
 
@@ -110,9 +105,9 @@ def test_import_replay_tool_delegates_to_coach(monkeypatch):
 
 
 def test_list_games_returns_imported_game(game):
-    games = list_games()
-    assert [g["id"] for g in games] == [GAME_ID]
-    assert games[0]["team0_score"] == 3
+    games = list_games()["games"]
+    assert [g["game_id"] for g in games] == [GAME_ID]
+    assert games[0]["score"].startswith("3-")
 
 
 def test_get_match_summary_lists_players(game):
@@ -131,10 +126,6 @@ def test_get_player_stats_unknown_player_lists_available(game):
     result = get_player_stats(game, "Nobody")
     assert result["error"] == "Joueur introuvable."
     assert set(result["available_players"]) == {"Alice", "Bob"}
-
-
-def test_compare_players_returns_every_player(game):
-    assert {p["name"] for p in compare_players(game)["players"]} == {"Alice", "Bob"}
 
 
 def test_unknown_game_returns_error(games_dir):
@@ -170,37 +161,39 @@ def test_suggest_training_rejects_unknown_area():
     assert "error" in suggest_training(["cooking"])
 
 
-def _second_game(games_dir):
-    shutil.copytree(games_dir / GAME_ID, games_dir / "Stadium_P_Online-1v1_def")
+def test_list_games_filters_by_player_name(game):
+    assert [g["game_id"] for g in list_games("ali")["games"]] == [GAME_ID]
+    assert list_games("Zed") == {"games": []}
 
 
-def test_analyze_player_across_matches_aggregates_imported_games(game, games_dir):
-    _second_game(games_dir)
+def test_list_games_delegates_to_coach_without_none_argument(monkeypatch):
+    calls = []
 
-    result = analyze_player_across_matches("alice")
+    def fake_run_tool(name, arguments_json, game_id):
+        calls.append((name, json.loads(arguments_json), game_id))
+        return json.dumps({"games": []})
 
-    assert result["player"] == "Alice"
-    assert result["games_analyzed"] == 2
-    assert result["totals"]["goals"] == 6
+    monkeypatch.setattr(coach, "run_tool", fake_run_tool)
 
+    list_games()
+    list_games("Alice")
 
-def test_analyze_player_across_matches_needs_no_game_id(games_dir):
-    assert analyze_player_across_matches("Alice") == {"error": "Aucune partie importée correspondante."}
-
-
-def test_analyze_player_across_matches_unknown_player_lists_available(game):
-    result = analyze_player_across_matches("Nobody")
-
-    assert result["error"] == "Joueur introuvable dans les parties importées."
-    assert result["available_players"] == ["Alice", "Bob"]
+    assert calls == [
+        ("list_games", {}, None),
+        ("list_games", {"player_name": "Alice"}, None),
+    ]
 
 
-def test_analyze_player_across_matches_passes_last_n_and_team_size(game, games_dir):
-    _second_game(games_dir)
+def test_list_games_tool_player_name_is_optional():
+    tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    schema = tools["list_games"].input_schema
 
-    assert analyze_player_across_matches("Alice", last_n=1)["games_analyzed"] == 1
-    assert analyze_player_across_matches("Alice", team_size=2) == {"error": "Aucune partie importée correspondante."}
+    assert "player_name" in schema["properties"]
+    assert "player_name" not in schema.get("required", [])
 
 
-def test_analyze_player_across_matches_rejects_invalid_last_n(game):
-    assert "error" in analyze_player_across_matches("Alice", last_n=21)
+def test_list_games_tool_call_through_server(game):
+    result = asyncio.run(mcp.call_tool("list_games", {"player_name": "bob"}))
+
+    assert not result.is_error
+    assert [g["game_id"] for g in json.loads(result.content[0].text)["games"]] == [GAME_ID]

@@ -280,16 +280,14 @@ def test_store_match_returns_folder_and_flag(games_dir, fake_raw):
 
 
 def test_tools_does_not_expose_import_replay_to_the_llm():
-    # CLAUDE.md says "3 outils" but TOOLS already held 7 before import_replay was added (outdated doc).
     names = [tool["function"]["name"] for tool in coach.TOOLS]
     assert names == [
         "get_match_summary",
         "get_player_stats",
-        "compare_players",
         "choose_player",
         "show_heatmap",
         "get_match_events",
         "suggest_training",
-        "analyze_player_across_matches",
+        "list_games",
     ]
     assert "import_replay" not in names
