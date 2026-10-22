@@ -12,7 +12,9 @@ from app.services import coach, storage
 
 INSTRUCTIONS = (
     "Statistiques Rocket League des parties importées dans RL-Coach. Commence par list_games pour obtenir "
-    "les game_id, puis interroge une partie. Les données sont brutes : le coaching est à toi de le faire."
+    "les game_id, puis interroge une partie. Si list_games renvoie une liste vide, ou si l'utilisateur veut "
+    "ajouter une partie, propose-lui d'importer un .replay : demande-lui le chemin absolu du fichier, puis "
+    "appelle import_replay. Les données sont brutes : le coaching est à toi de le faire."
 )
 
 mcp = MCPServer("rl-coach", instructions=INSTRUCTIONS)
@@ -25,8 +27,18 @@ def _call(tool: str, game_id: str | None = None, **arguments) -> dict:
 
 @mcp.tool()
 def list_games() -> list[dict]:
-    """Parties importées (la plus récente d'abord) : game_id, fichier d'origine, date d'import, score, carte."""
+    """Parties importées (la plus récente d'abord) : game_id, fichier d'origine, date d'import, score, carte.
+
+    Liste vide : proposer à l'utilisateur d'importer un .replay avec import_replay."""
     return [game.model_dump() for game in storage.list_games()]
+
+
+@mcp.tool()
+def import_replay(file_path: str) -> dict:
+    """Importe un fichier .replay local (50 Mo max) ; file_path doit être le chemin ABSOLU du fichier.
+
+    Renvoie game_id, à utiliser ensuite avec les autres outils. already_imported est vrai si la partie existait déjà."""
+    return coach.import_replay(file_path)
 
 
 @mcp.tool()

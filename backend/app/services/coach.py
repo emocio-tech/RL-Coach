@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import openai
 from openai import OpenAI
@@ -268,6 +269,41 @@ def run_tool(
     except Exception:
         result = {"error": "Erreur interne lors de l'exécution de l'outil."}
     return json.dumps(result, ensure_ascii=False)
+
+
+def import_replay(file_path: str | None) -> dict:
+    """Import a local .replay file (read only, never copied, moved or deleted) and return its game_id."""
+    if not isinstance(file_path, str) or not file_path.strip():
+        return {"error": "Chemin du fichier manquant."}
+    raw_path = file_path.strip()
+    path = Path(raw_path)
+    if not path.is_absolute():
+        return {"error": "Chemin absolu requis."}
+    if raw_path.startswith("\\\\"):
+        return {"error": "Les chemins réseau (UNC) sont refusés."}
+    if not path.name.lower().endswith(config.ALLOWED_EXTENSION):
+        return {"error": "Seuls les fichiers .replay sont acceptés."}
+    try:
+        if path.is_symlink():
+            return {"error": "Les liens symboliques sont refusés."}
+        if not path.is_file():
+            return {"error": "Fichier introuvable."}
+        size = path.stat().st_size
+        if size == 0:
+            return {"error": "Fichier vide."}
+        if size > config.MAX_UPLOAD_BYTES:
+            return {"error": "Fichier trop volumineux (50 Mo max)."}
+        content = path.read_bytes()
+        game_id, already_imported = storage.import_replay_bytes(content, path.name)
+    except OSError:
+        return {"error": "Fichier illisible."}
+    except ValueError as exc:
+        return {"error": str(exc)}
+    except RuntimeError:
+        return {"error": "rrrocket introuvable : voir backend/bin/."}
+    except Exception:
+        return {"error": "Erreur interne lors de l'import."}
+    return {"game_id": game_id, "already_imported": already_imported}
 
 
 def _find_player(

@@ -42,34 +42,45 @@ async def save_replay(file: UploadFile) -> UploadResult:
         if total > config.MAX_UPLOAD_BYTES:
             raise ValueError("File too large")
         chunks.append(chunk)
-    if total == 0:
-        raise ValueError("Empty file")
     content = b"".join(chunks)
 
-    raw = await run_in_threadpool(parser.parse_replay, content)
+    folder_id, _ = await run_in_threadpool(import_replay_bytes, content, name)
+    return UploadResult(id=folder_id)
+
+
+def import_replay_bytes(content: bytes, filename: str) -> tuple[str, bool]:
+    """Parse and store a replay; return (game_id, already_imported)."""
+    if not filename.lower().endswith(config.ALLOWED_EXTENSION):
+        raise ValueError("Only .replay files are accepted")
+    if len(content) == 0:
+        raise ValueError("Empty file")
+    if len(content) > config.MAX_UPLOAD_BYTES:
+        raise ValueError("File too large")
+
+    raw = parser.parse_replay(content)
 
     properties = (raw.get("properties") if isinstance(raw, dict) else None) or {}
     has_id = bool(properties.get("Id"))
     replay_id = str(properties.get("Id") or uuid.uuid4().hex)
-    original_filename = re.sub(r"[\x00-\x1f\x7f]", "", Path(name).name)[:255]
+    original_filename = re.sub(r"[\x00-\x1f\x7f]", "", Path(filename).name)[:255]
 
-    folder_id = await run_in_threadpool(
-        _store_match, raw, properties, replay_id, has_id, original_filename
-    )
-    return UploadResult(id=folder_id)
+    return _store_match(raw, properties, replay_id, has_id, original_filename)
 
 
 def _store_match(
     raw: dict, properties: dict, replay_id: str, has_id: bool, original_filename: str
-) -> str:
-    """Find an existing folder for this replay or write a new one, atomically."""
+) -> tuple[str, bool]:
+    """Find an existing folder for this replay or write a new one, atomically.
+
+    Returns (folder name, True if the replay was already imported and nothing was written)."""
     with _STORE_LOCK:
         if has_id:
             existing = _find_existing_folder(replay_id)
             if existing is not None:
-                return existing.name
+                return existing.name, True
         stats_file, map_file = stats.build_match_files(replay_id, original_filename, raw)
-        return _write_match_folder(_folder_name(properties, replay_id), stats_file, map_file)
+        folder = _write_match_folder(_folder_name(properties, replay_id), stats_file, map_file)
+        return folder, False
 
 
 def _find_existing_folder(replay_id: str) -> Path | None:

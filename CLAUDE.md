@@ -34,11 +34,11 @@ RL-Coach/
 2. Le back extrait les données via rrrocket, puis sauvegarde uniquement `stats.json` et `map.json` dans un dossier de `data/games/` (nom `<stade>_<mode>_<id replay>`, suffixe `_N` en cas de collision entre deux matchs différents ; un replay déjà importé, même `Id`, renvoie le dossier existant sans rien écrire) ; le `.replay` n'est jamais conservé.
 
 ## Coach IA
-- `POST /api/chat` (`routes/chat.py`, `schemas/chat.py`) : chat stateless, le front renvoie l'historique ; `services/coach.py` appelle le LLM (SDK OpenAI, function calling, 3 outils sans `game_id`, fixé côté serveur).
+- `POST /api/chat` (`routes/chat.py`, `schemas/chat.py`) : chat stateless, le front renvoie l'historique ; `services/coach.py` appelle le LLM (SDK OpenAI, function calling, 7 outils sans `game_id`, fixé côté serveur).
 - Config via `.env` à la racine (ignoré par Git, modèle : `.env.example`) : `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `LLM_MODEL` (défaut `nova-lite`). Ne jamais committer le `.env`.
 
 ## Serveur MCP
-- `backend/app/mcp_server.py` (stdio, SDK `mcp` 2.x) expose les parties importées à tout agent MCP : 7 outils en lecture seule qui réutilisent `services/coach.py` avec `game_id` en argument. Lancement : `cd backend; python -m app.mcp_server`. Aucun `print` (stdout = protocole).
+- `backend/app/mcp_server.py` (stdio, SDK `mcp` 2.x) expose les parties importées à tout agent MCP : 8 outils (7 en lecture seule qui réutilisent `services/coach.py` avec `game_id` en argument, plus `import_replay` qui importe un `.replay` local par chemin absolu via `coach.import_replay`, absent du chat). Lancement : `cd backend; python -m app.mcp_server`. Aucun `print` (stdout = protocole).
 - `.mcp.json` à la racine branche Claude Code ; autres agents : voir `docs/mcp.md`.
 
 ## Commandes
