@@ -242,5 +242,6 @@ Le serveur est en lecture seule : il n'importe ni ne supprime de partie. Il n'of
 | 17 | 2026-10-21 16:40 | iwao | issue-41-3d-view-improvements |
 | 18 | 2026-10-21 16:42 | TatouGou | issue-12-create-mcp-server |
 | 19 | 2026-10-22 10:44 | TatouGou | issue-47-llm-call-logs |
+| 20 | 2026-10-22 11:04 | Dimitri FORT | issue-46-cross-match-analysis-tool |
 
 </details>
