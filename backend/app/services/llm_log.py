@@ -4,6 +4,7 @@ import threading
 from datetime import datetime
 
 from app import config
+from app.services import storage
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +17,9 @@ _session_totals = _empty_totals()
 _request_totals: dict[str, dict] = {}
 _totals_lock = threading.Lock()
 
-# Tools that read no game file (the training plan is built from constants).
-TOOLS_WITHOUT_FILES = {"suggest_training"}
+# Tools that read no game file of their own: the training plan is built from constants, and list_games reads the
+# stats.json of every game (not the files of one game).
+TOOLS_WITHOUT_FILES = {"suggest_training", "list_games"}
 
 # Message roles, as sent to the LLM, mapped to the log categories.
 ROLE_CATEGORIES = {
@@ -46,9 +48,20 @@ def context_chars(conversation: list[dict], tools: list[dict] | None) -> dict[st
     return sizes
 
 
-def game_files(tool_name: str, game_id: str | None) -> list[str]:
-    """Files of data/games read by a tool (stats.json, plus 3dmatch.json when the game has one)."""
-    if not game_id or tool_name in TOOLS_WITHOUT_FILES:
+def game_files(tool_name: str, game_id: str | None, arguments_json: str | None = None) -> list[str]:
+    """Files of data/games read by a tool (stats.json, plus 3dmatch.json when the game has one).
+
+    The game is the game_id of the tool arguments, else `game_id` (the open game); an invalid id gives no file."""
+    if tool_name in TOOLS_WITHOUT_FILES:
+        return []
+    try:
+        arguments = json.loads(arguments_json) if arguments_json and arguments_json.strip() else {}
+    except ValueError:
+        arguments = {}
+    given = arguments.get("game_id") if isinstance(arguments, dict) else None
+    if isinstance(given, str) and given.strip():
+        game_id = given.strip()
+    if not game_id or not isinstance(game_id, str) or not storage.GAME_ID_PATTERN.fullmatch(game_id):
         return []
     return [
         f"data/games/{game_id}/{filename}"
@@ -140,7 +153,7 @@ def log_call(
         if tool_calls:
             lines.append("Réponse : appel d'outils")
             for call in tool_calls:
-                files = game_files(call.function.name, game_id)
+                files = game_files(call.function.name, game_id, call.function.arguments)
                 lines.append(
                     f"  - outil {call.function.name}({call.function.arguments or ''}) "
                     f"| fichiers lus : {', '.join(files) if files else 'aucun'}"

@@ -3,7 +3,6 @@ import re
 import shutil
 import threading
 import uuid
-from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -26,6 +25,7 @@ from app.schemas.replay import (
 from app.services import analysis, parser, stats, maps
 
 CHUNK_SIZE = 1024 * 1024
+MAX_LISTED_GAMES = 50
 GAME_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _STORE_LOCK = threading.Lock()
 
@@ -210,6 +210,46 @@ def list_games() -> list[ReplaySummary]:
     return sorted(games, key=lambda game: game.imported_at, reverse=True)
 
 
+def list_game_infos(player_name: str | None = None) -> list[dict]:
+    """Description of the imported games, most recent first (at most MAX_LISTED_GAMES).
+
+    Reads the stats.json of each game folder; unreadable folders are skipped. `player_name` keeps only the games
+    having a player whose name contains it (case-insensitive)."""
+    if not config.GAMES_DIR.is_dir():
+        return []
+    wanted = player_name.strip().casefold() if player_name and player_name.strip() else None
+    games = []
+    try:
+        folders = list(config.GAMES_DIR.iterdir())
+    except OSError:
+        return []
+    for folder in folders:
+        stats_path = folder / config.STATS_FILENAME
+        if not GAME_ID_PATTERN.fullmatch(folder.name) or not stats_path.is_file():
+            continue
+        try:
+            stats_file = StatsFile.model_validate_json(stats_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        names = [p.name for p in stats_file.players]
+        if wanted is not None and not any(wanted in name.casefold() for name in names):
+            continue
+        match = stats_file.match
+        games.append(
+            {
+                "game_id": folder.name,
+                "map_name": maps.display_name(match.map_name),
+                "match_type": match.match_type,
+                "team_size": match.team_size,
+                "date": match.date,
+                "score": f"{match.team0_score}-{match.team1_score}",
+                "players": names,
+            }
+        )
+    games.sort(key=lambda game: game["date"] or "", reverse=True)
+    return games[:MAX_LISTED_GAMES]
+
+
 def get_game_tracks(game_id: str) -> MatchTracks | None:
     """Tracks of every player and of the ball, or None if the game or its 3dmatch.json is missing."""
     if not GAME_ID_PATTERN.fullmatch(game_id):
@@ -236,28 +276,6 @@ def get_game_tracks(game_id: str) -> MatchTracks | None:
         duration_seconds=stats_file.match.duration_seconds,
         pads=map_file.pads,
     )
-
-
-def iter_game_reports(team_size: int | None = None) -> Iterator[tuple[str, GameReport]]:
-    """(game_id, report) of every readable imported game, optionally only those of a given team size."""
-    if not config.GAMES_DIR.is_dir():
-        return
-    try:
-        folders = sorted(config.GAMES_DIR.iterdir(), key=lambda p: p.name)
-    except OSError:
-        return
-    for folder in folders:
-        if folder.name.startswith(".tmp-") or not GAME_ID_PATTERN.fullmatch(folder.name):
-            continue
-        try:
-            report = get_game_report(folder.name)
-        except (OSError, ValueError):
-            continue
-        if report is None:
-            continue
-        if team_size is not None and report.match.team_size != team_size:
-            continue
-        yield folder.name, report
 
 
 def get_game_heatmaps(game_id: str) -> MatchHeatmaps | None:

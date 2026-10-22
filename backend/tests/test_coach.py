@@ -1,5 +1,4 @@
 import json
-import shutil
 from types import SimpleNamespace
 
 import httpx
@@ -112,13 +111,6 @@ def test_run_tool_get_player_stats_case_insensitive(game):
     assert result["name"] == "Bob"
 
 
-def test_run_tool_compare_players(game):
-    result = json.loads(coach.run_tool("compare_players", "{}", game))
-
-    assert [p["name"] for p in result["players"]] == ["Alice", "Bob"]
-    assert all("detail" in p for p in result["players"])
-
-
 # ---------- run_tool: errors ----------
 
 
@@ -159,7 +151,7 @@ def test_run_tool_unknown_tool(game):
 def test_run_tool_without_game_id(game_id):
     result = json.loads(coach.run_tool("get_match_summary", "{}", game_id))
 
-    assert result == {"error": "Aucune partie ouverte."}
+    assert result == {"error": "Aucune partie ouverte : appelle list_games pour trouver une partie."}
 
 
 def test_run_tool_game_not_found(games_dir):
@@ -185,12 +177,12 @@ def test_run_tool_never_raises_on_internal_failure(game, monkeypatch):
     assert result == {"error": "Erreur interne lors de l'exécution de l'outil."}
 
 
-def test_tools_declare_the_eight_expected_functions():
+def test_tools_declare_the_seven_expected_functions():
     names = [t["function"]["name"] for t in coach.TOOLS]
 
     assert names == [
-        "get_match_summary", "get_player_stats", "compare_players", "choose_player", "show_heatmap",
-        "get_match_events", "suggest_training", "analyze_player_across_matches",
+        "get_match_summary", "get_player_stats", "choose_player", "show_heatmap",
+        "get_match_events", "suggest_training", "list_games",
     ]
 
 
@@ -310,7 +302,7 @@ def test_chat_multiple_tool_calls_in_one_turn(llm, game):
     fake = llm([
         _response(tool_calls=[
             _tool_call("c1", "get_match_summary"),
-            _tool_call("c2", "compare_players"),
+            _tool_call("c2", "get_match_events"),
         ]),
         _response(content="Voilà."),
     ])
@@ -389,13 +381,14 @@ def test_chat_choose_player_among_other_tool_calls(llm, game, monkeypatch):
     assert executed == []
 
 
-def test_chat_choose_player_without_game_id_is_ignored(llm):
-    fake = llm([_response(content="Réponse", tool_calls=[_tool_call("c1", "choose_player")])])
+def test_chat_choose_player_without_game_id_returns_tool_error(llm):
+    fake = llm([_response(tool_calls=[_tool_call("c1", "choose_player")]), _response(content="Réponse")])
 
     result = coach.chat(_user(), None, None)
 
     assert result == coach.CoachReply(reply="Réponse", prompt=None)
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2
+    assert json.loads(fake.calls[1]["messages"][-1]["content"]) == {"error": "Aucune partie ouverte."}
 
 
 def test_chat_choose_player_game_missing_falls_back_to_tool_path(llm, monkeypatch):
@@ -500,19 +493,23 @@ def test_chat_reply_on_last_allowed_iteration(llm, game):
 # ---------- chat: limits ----------
 
 
-def test_chat_without_game_id_sends_no_tools(llm):
+def test_chat_without_game_id_sends_tools(llm):
     fake = llm([_response(content="Conseil général.")])
 
     coach.chat(_user(), None, None)
 
-    assert "tools" not in fake.calls[0]
+    assert fake.calls[0]["tools"] == coach.TOOLS
 
 
-def test_chat_without_game_id_ignores_tool_calls(llm):
-    fake = llm([_response(content="Réponse", tool_calls=[_tool_call("c", "get_match_summary")])])
+def test_chat_without_game_id_runs_tool_calls(llm):
+    fake = llm([
+        _response(tool_calls=[_tool_call("c", "get_match_summary")]),
+        _response(content="Réponse"),
+    ])
 
     assert coach.chat(_user(), None, None).reply == "Réponse"
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2
+    assert "list_games" in json.loads(fake.calls[1]["messages"][-1]["content"])["error"]
 
 
 def _history(n):
@@ -678,7 +675,6 @@ def test_run_tool_never_reads_3dmatch_file(game, monkeypatch):
     for tool, arguments in [
         ("get_match_summary", "{}"),
         ("get_player_stats", '{"player_name": "Alice"}'),
-        ("compare_players", "{}"),
         ("get_match_events", "{}"),
         ("show_heatmap", '{"player_name": "Alice"}'),
     ]:
@@ -758,7 +754,7 @@ def test_run_tool_show_heatmap_without_heatmap_file(game):
 def test_run_tool_show_heatmap_without_game_id(game_id):
     result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game_id, []))
 
-    assert result == {"error": "Aucune partie ouverte."}
+    assert result == {"error": "Aucune partie ouverte : appelle list_games pour trouver une partie."}
 
 
 def test_show_heatmap_tool_requires_player_name():
@@ -886,7 +882,7 @@ def test_build_system_prompt_mentions_show_heatmap_with_game():
 
 
 def test_build_system_prompt_no_show_heatmap_without_game():
-    assert "show_heatmap" not in coach.build_system_prompt(None, None)
+    assert "appelle show_heatmap" not in coach.build_system_prompt(None, None)
 
 
 # ---------- chat: show_heatmap ----------
@@ -1251,7 +1247,7 @@ def test_get_match_events_tool_arguments_are_optional_and_type_is_enum():
     parameters = tool["function"]["parameters"]
 
     assert "required" not in parameters
-    assert set(parameters["properties"]) == {"player_name", "event_type"}
+    assert set(parameters["properties"]) == {"player_name", "event_type", "game_id"}
     assert parameters["properties"]["event_type"]["enum"] == [
         "goal", "assist", "shot", "save", "demo_done", "demo_taken"
     ]
@@ -1487,7 +1483,7 @@ def test_run_tool_get_match_events_filter_below_cap_is_not_truncated(write_event
 
 @pytest.mark.parametrize("game_id", [None, ""])
 def test_run_tool_get_match_events_without_game_id(game_id):
-    assert _events_result(game_id) == {"error": "Aucune partie ouverte."}
+    assert _events_result(game_id) == {"error": "Aucune partie ouverte : appelle list_games pour trouver une partie."}
 
 
 def test_run_tool_get_match_events_game_not_found(games_dir):
@@ -1534,7 +1530,7 @@ def test_build_system_prompt_mentions_get_match_events_with_game():
 
 
 def test_build_system_prompt_no_get_match_events_without_game():
-    assert "get_match_events" not in coach.build_system_prompt(None, None)
+    assert "appelle get_match_events" not in coach.build_system_prompt(None, None)
 
 
 # ---------- selected player (dropdown of the statistics page) is the default player ----------
@@ -1721,14 +1717,17 @@ def test_chat_suggest_training_then_reply(llm, game):
     assert content["trainings"][0]["drills"][0]["name"] == training.CATALOG["boost"][1][0][0]
 
 
-def test_chat_suggest_training_is_ignored_without_game_id(llm):
-    fake = llm([_response(content="Réponse", tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost"))])])
+def test_chat_suggest_training_runs_without_game_id(llm):
+    fake = llm([
+        _response(tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost"))]),
+        _response(content="Voici ton plan."),
+    ])
 
     result = coach.chat(_user(), None, None)
 
-    assert result == coach.CoachReply(reply="Réponse", prompt=None)
-    assert len(fake.calls) == 1
-    assert all(m["role"] != "tool" for m in fake.calls[0]["messages"])
+    assert result == coach.CoachReply(reply="Voici ton plan.", prompt=None)
+    assert len(fake.calls) == 2
+    assert "trainings" in json.loads(fake.calls[1]["messages"][-1]["content"])
 
 
 def test_heatmap_reply_same_player_twice_gives_one_line():
@@ -1739,165 +1738,215 @@ def test_heatmap_reply_same_player_twice_gives_one_line():
     assert reply == "Temps passé par zone :\n\n**Alice** : 60 % en zone défensive, 30 % au milieu, 10 % en zone offensive."
 
 
-# ---------- analyze_player_across_matches ----------
+# ---------- list_games and game_id argument ----------
 
-SECOND_GAME_ID = "Stadium_P_Online-1v1_def"
+GAME_ID_TOOLS = ["get_match_summary", "get_player_stats", "show_heatmap", "get_match_events"]
+OTHER_GAME_ID = "Other_P_Online-1v1_xyz"
+NO_GAME_ERROR = {"error": "Aucune partie ouverte : appelle list_games pour trouver une partie."}
+
+
+def _tool_args(tool, player="Alice", **arguments):
+    """Arguments making `tool` valid (player_name where it is required)."""
+    if tool in ("get_player_stats", "show_heatmap"):
+        arguments["player_name"] = player
+    return json.dumps(arguments)
 
 
 @pytest.fixture
-def two_games(game, games_dir):
-    shutil.copytree(games_dir / game, games_dir / SECOND_GAME_ID)
-    return game
+def other_game(game, games_dir):
+    """A second game: same files as `game`, but Carol and Dave play in it."""
+    folder = games_dir / OTHER_GAME_ID
+    folder.mkdir()
+    for filename in (config.STATS_FILENAME, config.MATCH3D_FILENAME, config.HEATMAP_FILENAME):
+        text = (games_dir / game / filename).read_text(encoding="utf-8")
+        (folder / filename).write_text(text.replace("Alice", "Carol").replace("Bob", "Dave"), encoding="utf-8")
+    return OTHER_GAME_ID
 
 
-def _across(arguments, game_id=None, selected_player=None):
-    return json.loads(coach.run_tool("analyze_player_across_matches", json.dumps(arguments), game_id, None, selected_player))
+def test_run_tool_list_games_without_filter(game):
+    result = json.loads(coach.run_tool("list_games", "{}", None))
+
+    assert [g["game_id"] for g in result["games"]] == [game]
+    assert result["games"][0]["players"] == ["Alice", "Bob"]
+    assert result["games"][0]["score"] == "3-2"
 
 
-def test_analyze_across_matches_tool_declaration():
-    tool = next(t for t in coach.TOOLS if t["function"]["name"] == "analyze_player_across_matches")
-    parameters = tool["function"]["parameters"]
-
-    assert "required" not in parameters
-    assert set(parameters["properties"]) == {"player_name", "team_size", "last_n"}
-    assert parameters["properties"]["last_n"]["minimum"] == 1
-    assert parameters["properties"]["last_n"]["maximum"] == coach.crossmatch.MAX_LAST_N
+def test_run_tool_list_games_does_not_need_game_id(game):
+    assert coach.run_tool("list_games", None, "") == coach.run_tool("list_games", "{}", game)
 
 
-def test_run_tool_analyze_across_matches_nominal(two_games):
-    result = _across({"player_name": "Alice"}, two_games)
+def test_run_tool_list_games_filter_partial_and_case_insensitive(game):
+    result = json.loads(coach.run_tool("list_games", '{"player_name": "aLI"}', None))
 
-    assert result["player"] == "Alice"
-    assert result["games_analyzed"] == 2
-    assert result["totals"]["goals"] == 6
+    assert [g["game_id"] for g in result["games"]] == [game]
 
 
-def test_run_tool_analyze_across_matches_works_without_game_id(two_games):
-    result = _across({"player_name": "Alice"}, None)
-
-    assert result["games_analyzed"] == 2
+def test_run_tool_list_games_unknown_player(game):
+    assert json.loads(coach.run_tool("list_games", '{"player_name": "Zed"}', None)) == {"games": []}
 
 
-def test_run_tool_analyze_across_matches_does_not_need_game_to_exist(two_games):
-    assert _across({"player_name": "Alice"}, "Missing_Game_1")["games_analyzed"] == 2
+def test_run_tool_list_games_empty_directory(games_dir):
+    assert json.loads(coach.run_tool("list_games", "{}", None)) == {"games": []}
 
 
-def test_run_tool_analyze_across_matches_defaults_to_selected_player(two_games):
-    assert _across({}, two_games, selected_player="Bob")["player"] == "Bob"
+def test_run_tool_list_games_invalid_player_name_type(game):
+    result = json.loads(coach.run_tool("list_games", '{"player_name": 42}', None))
+
+    assert result == {"error": "Argument player_name invalide."}
 
 
-def test_run_tool_analyze_across_matches_explicit_name_overrides_selected_player(two_games):
-    assert _across({"player_name": "Bob"}, two_games, selected_player="Alice")["player"] == "Bob"
+def test_run_tool_list_games_ignores_corrupted_game(game, games_dir):
+    broken = games_dir / "Broken_P_Online-1v1_zzz"
+    broken.mkdir()
+    (broken / config.STATS_FILENAME).write_text("{oops", encoding="utf-8")
+
+    result = json.loads(coach.run_tool("list_games", "{}", None))
+
+    assert [g["game_id"] for g in result["games"]] == [game]
 
 
-def test_run_tool_analyze_across_matches_null_arguments_use_defaults(two_games):
-    result = _across({"player_name": "Alice", "team_size": None, "last_n": None}, two_games)
-
-    assert result["games_analyzed"] == 2
+def test_run_tool_list_games_invalid_json(game):
+    assert json.loads(coach.run_tool("list_games", "{bad", None)) == {"error": "Arguments invalides : JSON incorrect."}
 
 
-def test_run_tool_analyze_across_matches_empty_arguments_string(two_games):
-    result = json.loads(coach.run_tool("analyze_player_across_matches", None, None, None, "Alice"))
+def test_run_tool_list_games_limited_to_50_games(games_dir, game):
+    source = (games_dir / game / config.STATS_FILENAME).read_text(encoding="utf-8")
+    for n in range(51):
+        folder = games_dir / f"Extra_P_Online-1v1_{n:03d}"
+        folder.mkdir()
+        (folder / config.STATS_FILENAME).write_text(source, encoding="utf-8")
 
-    assert result["games_analyzed"] == 2
+    result = json.loads(coach.run_tool("list_games", "{}", None))
 
-
-@pytest.mark.parametrize("arguments", [{}, {"player_name": ""}, {"player_name": "  "}, {"player_name": 42}])
-def test_run_tool_analyze_across_matches_player_name_missing_or_invalid(two_games, arguments):
-    assert _across(arguments) == {"error": "Argument player_name manquant ou invalide."}
-
-
-def test_run_tool_analyze_across_matches_unknown_player(two_games):
-    result = _across({"player_name": "Zed"})
-
-    assert result["error"] == "Joueur introuvable dans les parties importées."
-    assert result["available_players"] == ["Alice", "Bob"]
+    assert len(result["games"]) == 50
 
 
-def test_run_tool_analyze_across_matches_no_game_imported(games_dir):
-    assert _across({"player_name": "Alice"}) == {"error": "Aucune partie importée correspondante."}
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+def test_run_tool_game_id_argument_without_open_game(game, tool):
+    result = json.loads(coach.run_tool(tool, _tool_args(tool, game_id=game), None))
+
+    assert "error" not in result, result
 
 
-@pytest.mark.parametrize("team_size", [0, -1, "1", 1.5, True, [1]])
-def test_run_tool_analyze_across_matches_invalid_team_size(two_games, team_size):
-    result = _across({"player_name": "Alice", "team_size": team_size})
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+def test_run_tool_game_id_argument_has_priority_over_open_game(other_game, game, tool):
+    # Carol only exists in the other game: the call succeeds only if the argument wins over the open game.
+    result = json.loads(coach.run_tool(tool, _tool_args(tool, player="Carol", game_id=other_game), game))
 
-    assert result == {"error": "Argument team_size invalide : entier positif attendu."}
-
-
-@pytest.mark.parametrize("last_n", [0, -3, 21, "5", 2.5, True])
-def test_run_tool_analyze_across_matches_invalid_last_n(two_games, last_n):
-    result = _across({"player_name": "Alice", "last_n": last_n})
-
-    assert result == {"error": "Argument last_n invalide : entier entre 1 et 20 attendu."}
+    assert "error" not in result, result
 
 
-@pytest.mark.parametrize("last_n", [1, 20])
-def test_run_tool_analyze_across_matches_last_n_bounds_accepted(two_games, last_n):
-    assert "error" not in _across({"player_name": "Alice", "last_n": last_n})
+def test_run_tool_get_match_summary_game_id_argument_reads_that_game(other_game, game):
+    result = json.loads(coach.run_tool("get_match_summary", json.dumps({"game_id": other_game}), game))
+
+    assert [p["name"] for p in result["players"]] == ["Carol", "Dave"]
 
 
-def test_run_tool_analyze_across_matches_team_size_filter(two_games):
-    assert _across({"player_name": "Alice", "team_size": 1})["games_analyzed"] == 2
-    assert _across({"player_name": "Alice", "team_size": 3}) == {"error": "Aucune partie importée correspondante."}
+def test_run_tool_game_id_argument_with_surrounding_spaces_is_stripped(game):
+    result = json.loads(coach.run_tool("get_match_summary", json.dumps({"game_id": f"  {game} "}), None))
+
+    assert len(result["players"]) == 2
 
 
-def test_run_tool_analyze_across_matches_invalid_json():
-    result = json.loads(coach.run_tool("analyze_player_across_matches", "{not json", None))
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+@pytest.mark.parametrize("empty", ["", None])
+def test_run_tool_empty_game_id_argument_falls_back_to_open_game(game, tool, empty):
+    result = json.loads(coach.run_tool(tool, _tool_args(tool, game_id=empty), game))
 
-    assert result == {"error": "Arguments invalides : JSON incorrect."}
-
-
-def test_run_tool_analyze_across_matches_never_raises_on_internal_failure(two_games, monkeypatch):
-    def boom(*_a, **_k):
-        raise RuntimeError("disk exploded")
-
-    monkeypatch.setattr(coach.crossmatch, "analyze_player", boom)
-
-    assert _across({"player_name": "Alice"}) == {"error": "Erreur interne lors de l'exécution de l'outil."}
+    assert "error" not in result, result
 
 
-def test_chat_analyze_across_matches_then_reply(llm, two_games):
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+@pytest.mark.parametrize("empty", ["", None])
+def test_run_tool_empty_game_id_argument_without_open_game(games_dir, tool, empty):
+    assert json.loads(coach.run_tool(tool, _tool_args(tool, game_id=empty), None)) == NO_GAME_ERROR
+
+
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+@pytest.mark.parametrize("bad_id", ["../x", "a/b", "..", ".hidden", "a b", "-start"])
+def test_run_tool_invalid_game_id_argument(game, tool, bad_id):
+    result = json.loads(coach.run_tool(tool, _tool_args(tool, game_id=bad_id), game))
+
+    assert result == {"error": "Argument game_id invalide : utilise un game_id renvoyé par list_games."}
+
+
+@pytest.mark.parametrize("bad_id", [42, ["a"], {"a": 1}, True])
+def test_run_tool_game_id_argument_of_wrong_type(game, bad_id):
+    result = json.loads(coach.run_tool("get_match_summary", json.dumps({"game_id": bad_id}), game))
+
+    assert "game_id invalide" in result["error"]
+
+
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+def test_run_tool_unknown_game_id_argument(game, tool):
+    result = json.loads(coach.run_tool(tool, _tool_args(tool, game_id="Missing_P_Online-1v1_zzz"), game))
+
+    assert result == {"error": "Partie introuvable : utilise un game_id renvoyé par list_games."}
+
+
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+def test_run_tool_without_any_game_id_for_each_tool(games_dir, tool):
+    assert json.loads(coach.run_tool(tool, _tool_args(tool), None)) == NO_GAME_ERROR
+
+
+def test_run_tool_suggest_training_ignores_game_id_argument(games_dir):
+    args = json.dumps({"focus_areas": ["boost"], "game_id": "../x"})
+
+    assert "trainings" in json.loads(coach.run_tool("suggest_training", args, None))
+
+
+@pytest.mark.parametrize("name", ["compare_players", "analyze_player_across_matches"])
+def test_removed_tools_are_not_declared(name):
+    assert name not in [t["function"]["name"] for t in coach.TOOLS]
+    assert json.loads(coach.run_tool(name, "{}", GAME_ID)) == {"error": f"Outil inconnu : {name}"}
+
+
+@pytest.mark.parametrize("tool", GAME_ID_TOOLS)
+def test_game_id_tools_declare_an_optional_game_id(tool):
+    function = next(t["function"] for t in coach.TOOLS if t["function"]["name"] == tool)
+
+    assert function["parameters"]["properties"]["game_id"] == coach.GAME_ID_PROPERTY
+    assert "game_id" not in function["parameters"].get("required", [])
+
+
+def test_list_games_tool_declares_optional_player_name():
+    function = next(t["function"] for t in coach.TOOLS if t["function"]["name"] == "list_games")
+
+    assert "player_name" in function["parameters"]["properties"]
+    assert "player_name" not in function["parameters"].get("required", [])
+
+
+def test_build_system_prompt_describes_list_games_with_and_without_game():
+    assert "list_games" in coach.build_system_prompt(GAME_ID, None)
+    assert "list_games" in coach.build_system_prompt(None, None)
+
+
+def test_build_system_prompt_mentions_open_game_id_only_when_open():
+    assert f'"{GAME_ID}"' in coach.build_system_prompt(GAME_ID, None)
+    assert GAME_ID not in coach.build_system_prompt(None, None)
+
+
+def test_chat_without_game_id_executes_list_games_then_game_tool(llm, game):
     fake = llm([
-        _response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", '{"player_name": "alice"}')]),
-        _response(content="Sur 2 parties, 6 buts."),
+        _response(tool_calls=[_tool_call("c1", "list_games")]),
+        _response(tool_calls=[_tool_call("c2", "get_match_summary", json.dumps({"game_id": game}))]),
+        _response(content="Voilà."),
     ])
 
-    reply = coach.chat(_user("Mon évolution ?"), two_games, "Alice")
+    reply = coach.chat(_user(), None, None)
 
-    assert reply.reply == "Sur 2 parties, 6 buts."
-    assert any(t["function"]["name"] == "analyze_player_across_matches" for t in fake.calls[0]["tools"])
-    tool_msg = fake.calls[1]["messages"][-1]
-    assert tool_msg["role"] == "tool"
-    assert tool_msg["tool_call_id"] == "a1"
-    content = json.loads(tool_msg["content"])
-    assert content["games_analyzed"] == 2
-    assert content["totals"]["goals"] == 6
+    assert reply.reply == "Voilà."
+    assert all(call["tools"] == coach.TOOLS for call in fake.calls)
+    assert [g["game_id"] for g in json.loads(fake.calls[1]["messages"][-1]["content"])["games"]] == [game]
+    assert len(json.loads(fake.calls[2]["messages"][-1]["content"])["players"]) == 2
 
 
-def test_chat_analyze_across_matches_uses_selected_player_by_default(llm, two_games):
-    fake = llm([_response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", "{}")]), _response(content="Ok")])
-
-    coach.chat(_user(), two_games, "Bob")
-
-    assert json.loads(fake.calls[1]["messages"][-1]["content"])["player"] == "Bob"
-
-
-def test_chat_analyze_across_matches_error_is_sent_to_model(llm, two_games):
+def test_chat_invalid_game_id_argument_returns_tool_error(llm, game):
     fake = llm([
-        _response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", '{"player_name": "alice", "last_n": 99}')]),
-        _response(content="Je réessaie."),
+        _response(tool_calls=[_tool_call("c1", "get_match_summary", '{"game_id": "../x"}')]),
+        _response(content="Désolé."),
     ])
 
-    coach.chat(_user(), two_games, "Alice")
+    coach.chat(_user(), game, "Alice")
 
-    assert "last_n" in json.loads(fake.calls[1]["messages"][-1]["content"])["error"]
-
-
-def test_build_system_prompt_mentions_analyze_player_across_matches_with_game():
-    assert "analyze_player_across_matches" in coach.build_system_prompt(GAME_ID, None)
-    assert "analyze_player_across_matches" in coach.build_system_prompt(GAME_ID, "Alice")
-
-
-def test_build_system_prompt_no_analyze_player_across_matches_without_game():
-    assert "analyze_player_across_matches" not in coach.build_system_prompt(None, None)
+    assert "game_id invalide" in json.loads(fake.calls[1]["messages"][-1]["content"])["error"]

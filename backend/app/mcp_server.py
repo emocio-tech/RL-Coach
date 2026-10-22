@@ -8,12 +8,12 @@ import json
 
 from mcp.server.mcpserver import MCPServer
 
-from app.services import coach, storage
+from app.services import coach
 
 INSTRUCTIONS = (
     "Statistiques Rocket League des parties importées dans RL-Coach. Commence par list_games pour obtenir "
-    "les game_id, puis interroge une partie. Pour une vue sur plusieurs parties (évolution, style général), "
-    "utilise analyze_player_across_matches (sans game_id). Si list_games renvoie une liste vide, ou si l'utilisateur veut "
+    "les game_id (filtre optionnel player_name pour retrouver les parties d'un joueur), puis interroge une partie. "
+    "Si list_games renvoie une liste vide, ou si l'utilisateur veut "
     "ajouter une partie, propose-lui d'importer un .replay : demande-lui le chemin absolu du fichier, puis "
     "appelle import_replay. Les données sont brutes : le coaching est à toi de le faire."
 )
@@ -27,11 +27,13 @@ def _call(tool: str, game_id: str | None = None, **arguments) -> dict:
 
 
 @mcp.tool()
-def list_games() -> list[dict]:
-    """Parties importées (la plus récente d'abord) : game_id, fichier d'origine, date d'import, score, carte.
+def list_games(player_name: str | None = None) -> dict:
+    """Parties importées (la plus récente d'abord, 50 au maximum) : game_id, carte, mode, date, score, joueurs.
 
+    player_name (optionnel) : ne garde que les parties d'un joueur dont le nom contient ce texte (casse ignorée).
     Liste vide : proposer à l'utilisateur d'importer un .replay avec import_replay."""
-    return [game.model_dump() for game in storage.list_games()]
+    arguments = {"player_name": player_name}
+    return _call("list_games", **{k: v for k, v in arguments.items() if v is not None})
 
 
 @mcp.tool()
@@ -55,12 +57,6 @@ def get_player_stats(game_id: str, player_name: str) -> dict:
 
 
 @mcp.tool()
-def compare_players(game_id: str) -> dict:
-    """Stats complètes de tous les joueurs d'une partie, côte à côte."""
-    return _call("compare_players", game_id)
-
-
-@mcp.tool()
 def get_match_events(game_id: str, player_name: str | None = None, event_type: str | None = None) -> dict:
     """Instants (mm:ss depuis le début du replay) des buts, passes, tirs, arrêts et démolitions.
 
@@ -81,16 +77,6 @@ def suggest_training(focus_areas: list[str]) -> dict:
 
     Axes possibles : boost, positioning, rotation, defense, shooting, speed, aerials, ball_control."""
     return _call("suggest_training", focus_areas=focus_areas)
-
-
-@mcp.tool()
-def analyze_player_across_matches(player_name: str, team_size: int | None = None, last_n: int = 20) -> dict:
-    """Analyse un joueur (pseudo, casse ignorée) sur ses dernières parties importées, tous game_id confondus.
-
-    Totaux, moyennes par partie, pourcentages pondérés par le temps suivi, détail par partie et tendance
-    (si au moins 4 parties). team_size filtre un mode ; last_n : 1 à 20 parties les plus récentes."""
-    arguments = {"player_name": player_name, "team_size": team_size, "last_n": last_n}
-    return _call("analyze_player_across_matches", **{k: v for k, v in arguments.items() if v is not None})
 
 
 if __name__ == "__main__":
