@@ -160,6 +160,16 @@ def _write_match_folder(folder_name: str, stats_file, match3d_file, heatmap_file
         shutil.rmtree(tmp, ignore_errors=True)
         raise
 
+def get_heatmap_file(game_id: str) -> HeatmapFile | None:
+    """Content of heatmap.json, or None if the game or the file does not exist."""
+    if not GAME_ID_PATTERN.fullmatch(game_id):
+        return None
+    heatmap_path = config.GAMES_DIR / game_id / config.HEATMAP_FILENAME
+    if not heatmap_path.is_file():
+        return None
+    return HeatmapFile.model_validate_json(heatmap_path.read_text(encoding="utf-8"))
+
+
 def get_player_heatmap(game_id: str, player_name: str) -> PlayerHeatmap | None:
     """Heatmap of one player (name compared ignoring case and surrounding spaces), or None if unavailable.
 
@@ -255,19 +265,17 @@ def get_game_heatmaps(game_id: str) -> MatchHeatmaps | None:
 
     The import step stores them without the dead-ball samples; 3dmatch.json is never read.
     """
-    if not GAME_ID_PATTERN.fullmatch(game_id):
-        return None
-    heatmap_path = config.GAMES_DIR / game_id / config.HEATMAP_FILENAME
-    if not heatmap_path.is_file():
-        return None
     try:
-        heatmap_file = HeatmapFile.model_validate_json(heatmap_path.read_text(encoding="utf-8"))
+        heatmap_file = get_heatmap_file(game_id)
     except (OSError, ValueError):
+        return None
+    if heatmap_file is None:
         return None
     return MatchHeatmaps(players=heatmap_file.players, ball=heatmap_file.ball)
 
 
-def get_game_report(game_id: str) -> GameReport | None:
+def get_game_report(game_id: str, include_match3d: bool = True) -> GameReport | None:
+    """Report of a game; without include_match3d, 3dmatch.json is not read (degraded report, no detailed stats)."""
     if not GAME_ID_PATTERN.fullmatch(game_id):
         return None
     folder = config.GAMES_DIR / game_id
@@ -279,7 +287,7 @@ def get_game_report(game_id: str) -> GameReport | None:
     map_path = folder / config.MATCH3D_FILENAME
     map_file = (
         Match3DFile.model_validate_json(map_path.read_text(encoding="utf-8"))
-        if map_path.is_file()
+        if include_match3d and map_path.is_file()
         else None
     )
     return analysis.build_report(game_id, stats_file, map_file)

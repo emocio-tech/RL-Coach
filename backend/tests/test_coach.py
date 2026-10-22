@@ -8,7 +8,7 @@ import pytest
 
 from app import config
 from app.schemas.chat import ChatMessage
-from app.schemas.replay import HeatmapFile, MatchEvent
+from app.schemas.replay import Heatmap, HeatmapFile, MatchEvent
 from app.services import coach, stats, storage, training
 
 GAME_ID = "Stadium_P_Online-1v1_abc"
@@ -399,7 +399,7 @@ def test_chat_choose_player_without_game_id_is_ignored(llm):
 
 
 def test_chat_choose_player_game_missing_falls_back_to_tool_path(llm, monkeypatch):
-    monkeypatch.setattr(coach.storage, "get_game_report", lambda _id: None)
+    monkeypatch.setattr(coach.storage, "get_game_report", lambda _id, **_kwargs: None)
     fake = llm([
         _response(tool_calls=[_tool_call("c1", "choose_player")]),
         _response(content="Désolé."),
@@ -656,13 +656,41 @@ def test_run_tool_show_heatmap(game):
 
 def test_run_tool_show_heatmap_zones_match_player_detail(game):
     result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, []))
-    detail = json.loads(coach.run_tool("get_player_stats", '{"player_name": "Alice"}', game))["detail"]
+    # The LLM has no access to 3dmatch.json: the reference is the full report, built with it.
+    detail = next(p for p in storage.get_game_report(game).players if p.stats.name == "Alice").detail
 
     assert result["zones_pct"] == {
-        "defensive": detail["defensive_zone_pct"],
-        "mid": detail["mid_zone_pct"],
-        "offensive": detail["offensive_zone_pct"],
+        "defensive": detail.defensive_zone_pct,
+        "mid": detail.mid_zone_pct,
+        "offensive": detail.offensive_zone_pct,
     }
+
+
+def test_run_tool_never_reads_3dmatch_file(game, monkeypatch):
+    real_read_text = type(config.GAMES_DIR).read_text
+
+    def guarded_read_text(self, *args, **kwargs):
+        assert self.name != config.MATCH3D_FILENAME, "the LLM tools must not read 3dmatch.json"
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(config.GAMES_DIR), "read_text", guarded_read_text)
+
+    for tool, arguments in [
+        ("get_match_summary", "{}"),
+        ("get_player_stats", '{"player_name": "Alice"}'),
+        ("compare_players", "{}"),
+        ("get_match_events", "{}"),
+        ("show_heatmap", '{"player_name": "Alice"}'),
+    ]:
+        assert "error" not in json.loads(coach.run_tool(tool, arguments, game, []))
+
+
+def test_run_tool_get_player_stats_has_no_detailed_stats_without_3dmatch_access(game):
+    detail = json.loads(coach.run_tool("get_player_stats", '{"player_name": "Alice"}', game))["detail"]
+
+    assert detail["tracked_time_s"] == 0.0
+    assert detail["y"] == [] and detail["ball_distance"] == []
+    assert all(value is None for key, value in detail.items() if key.endswith("_pct") or key.startswith("avg_"))
 
 
 def test_run_tool_show_heatmap_result_has_no_counts(game):
@@ -787,6 +815,66 @@ def test_run_tool_show_heatmap_reads_heatmap_json_without_3dmatch_file(game):
     assert result["displayed"] is True
     assert [h.player for h in heatmaps] == ["Alice"]
     assert heatmaps[0].heatmap.counts == _stored_counts(game, "Alice")
+
+
+def test_run_tool_show_heatmap_reads_only_heatmap_json(game):
+    (config.GAMES_DIR / game / config.STATS_FILENAME).unlink()
+    (config.GAMES_DIR / game / config.MATCH3D_FILENAME).unlink()
+    heatmaps = []
+
+    result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', game, heatmaps))
+
+    assert result["displayed"] is True
+    assert [h.player for h in heatmaps] == ["Alice"]
+
+
+def test_run_tool_show_heatmap_unknown_player_lists_players_from_heatmap_json(game):
+    (config.GAMES_DIR / game / config.STATS_FILENAME).unlink()
+
+    result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Zed"}', game, []))
+
+    assert result == {"error": "Joueur introuvable.", "available_players": ["Alice", "Bob"]}
+
+
+def test_run_tool_show_heatmap_unknown_game(games_dir):
+    result = json.loads(coach.run_tool("show_heatmap", '{"player_name": "Alice"}', "Missing_Game_1", []))
+
+    assert result == {"error": "Heatmap indisponible pour ce joueur."}
+
+
+def _grid(column_counts):
+    """Heatmap with one column of the long axis (y, -5120..5120) per value; the counts sit in the first x row."""
+    counts = [list(column_counts), [0] * len(column_counts)]
+    return Heatmap(x_min=-4096, x_max=4096, y_min=-5120, y_max=5120, counts=counts)
+
+
+def test_zones_pct_team_0_defends_negative_y():
+    # 6 columns of 1706.67 units: the first two are the defensive zone, the middle two the mid zone, the last two the offensive one.
+    heatmap = _grid([6, 0, 0, 0, 0, 2])
+
+    zones = coach._zones_pct(heatmap, 0)
+
+    assert zones == {"defensive": 75.0, "mid": 0.0, "offensive": 25.0}
+
+
+def test_zones_pct_team_1_is_mirrored():
+    heatmap = _grid([6, 0, 0, 0, 0, 2])
+
+    zones = coach._zones_pct(heatmap, 1)
+
+    assert zones == {"defensive": 25.0, "mid": 0.0, "offensive": 75.0}
+
+
+def test_zones_pct_all_in_middle():
+    heatmap = _grid([0, 0, 4, 4, 0, 0])
+
+    assert coach._zones_pct(heatmap, 0) == {"defensive": 0.0, "mid": 100.0, "offensive": 0.0}
+
+
+def test_zones_pct_empty_heatmap_has_no_percentages():
+    heatmap = _grid([0, 0, 0, 0, 0, 0])
+
+    assert coach._zones_pct(heatmap, 0) == {"defensive": None, "mid": None, "offensive": None}
 
 
 # ---------- build_system_prompt: show_heatmap ----------

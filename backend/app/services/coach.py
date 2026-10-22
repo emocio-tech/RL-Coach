@@ -1,4 +1,5 @@
 import json
+import math
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,7 +9,7 @@ from openai import OpenAI
 
 from app import config
 from app.schemas.chat import ChatHeatmap, ChatMessage, ChoicePrompt, ChoiceStep
-from app.schemas.replay import PlayerReport, PlayerStats
+from app.schemas.replay import Heatmap, PlayerReport, PlayerStats
 from app.services import crossmatch, llm_log, storage, training
 from app.services.timeline import build_timeline_events
 
@@ -343,23 +344,67 @@ def import_replay(file_path: str | None) -> dict:
     return {"game_id": game_id, "already_imported": already_imported}
 
 
-def _find_player(
-    report, arguments: dict, default_name: str | None = None
-) -> tuple[PlayerReport | None, dict | None]:
-    """The player named by arguments["player_name"] (default_name if absent), or an error result."""
+def _resolve_player_name(
+    available: list[str], arguments: dict, default_name: str | None = None
+) -> tuple[str | None, dict | None]:
+    """The name in `available` matching arguments["player_name"] (default_name if absent), or an error result."""
     player_name = arguments.get("player_name")
     if player_name is None:
         player_name = default_name
     if not isinstance(player_name, str) or not player_name.strip():
         return None, {"error": "Argument player_name manquant ou invalide."}
     wanted = player_name.strip().casefold()
-    for player in report.players:
-        if player.stats.name.casefold() == wanted:
-            return player, None
-    return None, {
-        "error": "Joueur introuvable.",
-        "available_players": [p.stats.name for p in report.players],
-    }
+    for name in available:
+        if name.casefold() == wanted:
+            return name, None
+    return None, {"error": "Joueur introuvable.", "available_players": available}
+
+
+def _find_player(
+    report, arguments: dict, default_name: str | None = None
+) -> tuple[PlayerReport | None, dict | None]:
+    """The player named by arguments["player_name"] (default_name if absent), or an error result."""
+    name, error = _resolve_player_name([p.stats.name for p in report.players], arguments, default_name)
+    if error:
+        return None, error
+    return next(p for p in report.players if p.stats.name == name), None
+
+
+def _zones_pct(heatmap: Heatmap, team: int) -> dict:
+    """Share of time (%) in the defensive, mid and offensive thirds of the field, from the heatmap grid.
+
+    counts[x][y]: y runs along the long axis of the field; team 0 defends the negative y side, team 1 the positive
+    one. A cell straddling a zone limit is shared between the zones in proportion to its overlap."""
+    cell = (heatmap.y_max - heatmap.y_min) / len(heatmap.counts[0])
+    limit = (heatmap.y_max - heatmap.y_min) / 6  # one third of the half-length of the field, as in analysis.py
+    totals = {"defensive": 0.0, "mid": 0.0, "offensive": 0.0}
+    for iy in range(len(heatmap.counts[0])):
+        count = sum(row[iy] for row in heatmap.counts)
+        low = heatmap.y_min + iy * cell
+        high = low + cell
+        if team != 0:
+            low, high = -high, -low
+        for zone, start, end in (("defensive", -math.inf, -limit), ("mid", -limit, limit), ("offensive", limit, math.inf)):
+            overlap = max(0.0, min(high, end) - max(low, start))
+            totals[zone] += count * overlap / cell
+    total = sum(totals.values())
+    return {zone: round(value / total * 100, 1) if total else None for zone, value in totals.items()}
+
+
+def _show_heatmap(
+    game_id: str, arguments: dict, selected_player: str | None, heatmaps: list[ChatHeatmap] | None
+) -> dict:
+    """show_heatmap: reads heatmap.json only (never stats.json nor 3dmatch.json)."""
+    heatmap_file = storage.get_heatmap_file(game_id)
+    if heatmap_file is None:
+        return {"error": "Heatmap indisponible pour ce joueur."}
+    name, error = _resolve_player_name([p.name for p in heatmap_file.players], arguments, selected_player)
+    if error:
+        return error
+    player = next(p for p in heatmap_file.players if p.name == name)
+    if heatmaps is not None and all(h.player != player.name for h in heatmaps):
+        heatmaps.append(ChatHeatmap(player=player.name, team=player.team, heatmap=player.heatmap))
+    return {"displayed": True, "player": player.name, "zones_pct": _zones_pct(player.heatmap, player.team)}
 
 
 def _match_events(report, arguments: dict) -> dict:
@@ -447,7 +492,9 @@ def _run_tool(
         return _analyze_across_matches(arguments, selected_player)
     if not game_id:
         return {"error": "Aucune partie ouverte."}
-    report = storage.get_game_report(game_id)
+    if name == "show_heatmap":
+        return _show_heatmap(game_id, arguments, selected_player, heatmaps)
+    report = storage.get_game_report(game_id, include_match3d=False)  # the LLM never reads 3dmatch.json
     if report is None:
         return {"error": "Partie introuvable."}
 
@@ -469,31 +516,13 @@ def _run_tool(
     player, error = _find_player(report, arguments, selected_player)
     if error:
         return error
-    if name == "show_heatmap":
-        player_heatmap = storage.get_player_heatmap(game_id, player.stats.name)  # the one the Heatmaps page shows
-        if player_heatmap is None:
-            return {"error": "Heatmap indisponible pour ce joueur."}
-        if heatmaps is not None and all(h.player != player_heatmap.name for h in heatmaps):
-            heatmaps.append(
-                ChatHeatmap(player=player_heatmap.name, team=player_heatmap.team, heatmap=player_heatmap.heatmap)
-            )
-        detail = player.detail
-        return {
-            "displayed": True,
-            "player": player.stats.name,
-            "zones_pct": {
-                "defensive": detail.defensive_zone_pct,
-                "mid": detail.mid_zone_pct,
-                "offensive": detail.offensive_zone_pct,
-            },
-        }
     return _player_payload(player)
 
 
 def _choice_prompt(game_id: str) -> ChoicePrompt | None:
     """Pseudo then goal questions for the open game, or None if the game cannot be read."""
     try:
-        report = storage.get_game_report(game_id)
+        report = storage.get_game_report(game_id, include_match3d=False)
     except Exception:
         return None
     if report is None:

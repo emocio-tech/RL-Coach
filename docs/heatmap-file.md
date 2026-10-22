@@ -51,10 +51,12 @@ Extrait de `heatmap.json` (valeurs illustratives, `counts` tronqué : la vraie g
 - L'import MCP `import_replay` passe par le même chemin.
 
 ### Lecture
-- `storage.get_game_heatmaps(game_id) -> MatchHeatmaps | None` lit uniquement `heatmap.json` ; `None` si l'id est invalide, le fichier absent ou invalide.
+- `storage.get_heatmap_file(game_id) -> HeatmapFile | None` lit `heatmap.json` en entier (`None` si l'id est invalide ou le fichier absent ; un fichier invalide lève `ValidationError`).
+- `storage.get_game_heatmaps(game_id) -> MatchHeatmaps | None` s'appuie dessus et renvoie `None` aussi pour un fichier invalide.
 - `storage.get_player_heatmap(game_id, player_name) -> PlayerHeatmap | None` passe par `get_game_heatmaps` (donc la même heatmap que la page) ; `None` si les heatmaps sont indisponibles ou le joueur introuvable (nom comparé sans casse, avec `strip()`).
-- `coach.show_heatmap` renvoie `{"error": "Heatmap indisponible pour ce joueur."}` quand le résultat est `None`, sinon ajoute un `ChatHeatmap(player, team, heatmap)` à la réponse.
-- `get_game_tracks` et `get_game_report` lisent `3dmatch.json`. Les `zones_pct` de `show_heatmap` viennent du rapport, donc de `3dmatch.json`.
+- `show_heatmap` (`coach._show_heatmap`) ne lit que `heatmap.json` : ni `stats.json` ni `3dmatch.json`. Le joueur est retrouvé dans `heatmap.json` (nom sans casse, joueur sélectionné par défaut). Erreurs : « Heatmap indisponible pour ce joueur. » (fichier absent ou partie inconnue), « Joueur introuvable. » avec `available_players` tirés de `heatmap.json`.
+- `zones_pct` (défensive / milieu / offensive) est calculé depuis la grille : l'axe long (`y`) est découpé en tiers de demi-terrain, l'équipe 0 défend le côté négatif et l'équipe 1 le côté positif ; une cellule à cheval sur une limite est répartie au prorata. Résultat arrondi à 0,1 %, `None` si la heatmap est vide. Ces valeurs sont une approximation (résolution de 20×26 cellules) des pourcentages de `3dmatch.json`.
+- `get_game_tracks` et `get_game_report` lisent `3dmatch.json`.
 
 ### Schémas (`backend/app/schemas/replay.py`)
 - `Match3DFile` (ex-`MapFile`) : `replay_id`, `players: list[PlayerMap]`, `ball`, `timeline_seconds | None`, `pads`.
@@ -65,8 +67,8 @@ Extrait de `heatmap.json` (valeurs illustratives, `counts` tronqué : la vraie g
 ### Erreurs
 | Condition | Comportement |
 |---|---|
-| `game_id` invalide, `heatmap.json` absent, joueur absent | `get_player_heatmap` renvoie `None` |
-| `heatmap.json` invalide | `get_game_heatmaps` renvoie `None` (la route répond 404, `show_heatmap` signale l'erreur) |
+| `game_id` invalide, `heatmap.json` absent, joueur absent | `get_player_heatmap` renvoie `None` ; `show_heatmap` renvoie « Heatmap indisponible pour ce joueur. » ou « Joueur introuvable. » |
+| `heatmap.json` invalide | `get_game_heatmaps` renvoie `None` (la route répond 404) ; `get_heatmap_file` lève `ValidationError` |
 | Ancien dossier avec `map.json` | ignoré : `/tracks` renvoie 404, le rapport passe en mode dégradé, `show_heatmap` signale l'erreur ; un réimport renvoie le dossier existant sans rien écrire |
 
 ### Périmètre
