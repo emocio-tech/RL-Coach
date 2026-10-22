@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 GAMES_DIR = ROOT_DIR / "data" / "games"
+LOGS_DIR = ROOT_DIR / "logs"
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 ALLOWED_EXTENSION = ".replay"
 STATS_FILENAME = "stats.json"

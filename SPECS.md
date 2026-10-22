@@ -193,6 +193,15 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 - Le coach refuse les sujets sans rapport avec Rocket League.
 - En cas de problème (coach non configuré, indisponible ou trop lent), un message d'erreur en français s'affiche dans le panneau.
 
+### Suivi de la consommation
+Chaque appel du coach au modèle de langage est enregistré dans un fichier texte par jour, dans un dossier `logs/` à la racine du projet. Ce dossier n'est pas versionné. Voir [#47](https://github.com/emocio-tech/RL-Coach/issues/47).
+
+- Chaque appel indique les tokens consommés (prompt, completion, total), la taille de ce qui est envoyé au modèle par catégorie (consigne système, messages de l'utilisateur, réponses du coach, résultats d'outils, définitions d'outils), les outils appelés avec leurs arguments et les fichiers de la partie lus par chaque outil.
+- Un message envoyé par l'utilisateur peut déclencher plusieurs appels au modèle. À la fin du traitement, le suivi indique le total de tokens du message.
+- Le suivi indique aussi le total de tokens consommés depuis le démarrage du back. Ce total repart de zéro quand le back redémarre.
+- Le texte des messages n'est pas enregistré.
+- Quand le fournisseur ne renvoie pas le nombre de tokens, le suivi l'indique à la place des chiffres. L'échec de l'écriture du suivi n'empêche pas le coach de répondre.
+
 ## Serveur MCP
 Un serveur MCP donne à n'importe quel agent compatible (Claude Code, GitHub Copilot, Cursor, Claude Desktop…) un accès aux parties déjà importées dans RL-Coach. Il fonctionne sans le back FastAPI, sans clé d'API et sans appeler de LLM. Les données fournies sont brutes : c'est l'agent qui rédige les conseils. Voir [#12](https://github.com/emocio-tech/RL-Coach/issues/12).
 
@@ -231,5 +240,6 @@ Le serveur est en lecture seule : il n'importe ni ne supprime de partie. Il n'of
 | 16 | 2026-10-21 14:24 | iwao | issue-35-positioning-page-momentum |
 | 17 | 2026-10-21 16:40 | iwao | issue-41-3d-view-improvements |
 | 18 | 2026-10-21 16:42 | TatouGou | issue-12-create-mcp-server |
+| 19 | 2026-10-22 10:44 | TatouGou | issue-47-llm-call-logs |
 
 </details>

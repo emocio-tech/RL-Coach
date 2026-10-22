@@ -38,6 +38,13 @@ def games_dir(tmp_path, monkeypatch):
     return target
 
 
+@pytest.fixture(autouse=True)
+def logs_dir(tmp_path, monkeypatch):
+    target = tmp_path / "logs"
+    monkeypatch.setattr(config, "LOGS_DIR", target)
+    return target
+
+
 @pytest.fixture
 def client(games_dir):
     return TestClient(app, raise_server_exceptions=False)

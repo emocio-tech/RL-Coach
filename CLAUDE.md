@@ -36,6 +36,7 @@ RL-Coach/
 ## Coach IA
 - `POST /api/chat` (`routes/chat.py`, `schemas/chat.py`) : chat stateless, le front renvoie l'historique ; `services/coach.py` appelle le LLM (SDK OpenAI, function calling, 7 outils sans `game_id`, fixé côté serveur).
 - Config via `.env` à la racine (ignoré par Git, modèle : `.env.example`) : `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `LLM_MODEL` (défaut `nova-lite`). Ne jamais committer le `.env`.
+- Log des appels LLM (`services/llm_log.py`) : un fichier `logs/llm-<date>.txt` (ignoré par Git), une entrée par appel LLM (tokens API, `total_message` (somme des appels d'un message utilisateur, écrite en fin de requête) et `total_session` (cumul depuis le démarrage du back), taille du contexte par catégorie, outils appelés, fichiers de partie lus).
 
 ## Serveur MCP
 - `backend/app/mcp_server.py` (stdio, SDK `mcp` 2.x) expose les parties importées à tout agent MCP : 8 outils (7 en lecture seule qui réutilisent `services/coach.py` avec `game_id` en argument, plus `import_replay` qui importe un `.replay` local par chemin absolu via `coach.import_replay`, absent du chat). Lancement : `cd backend; python -m app.mcp_server`. Aucun `print` (stdout = protocole).

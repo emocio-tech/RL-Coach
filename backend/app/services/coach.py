@@ -1,4 +1,5 @@
 import json
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from openai import OpenAI
 from app import config
 from app.schemas.chat import ChatHeatmap, ChatMessage, ChoicePrompt, ChoiceStep
 from app.schemas.replay import PlayerReport, PlayerStats
-from app.services import storage, training
+from app.services import llm_log, storage, training
 from app.services.timeline import build_timeline_events
 
 
@@ -477,6 +478,16 @@ def _complete(client: OpenAI, conversation: list[dict], kwargs: dict):
 
 
 def chat(messages: list[ChatMessage], game_id: str | None, selected_player: str | None) -> CoachReply:
+    request_id = uuid.uuid4().hex[:8]
+    try:
+        return _chat(messages, game_id, selected_player, request_id)
+    finally:
+        llm_log.log_request_end(request_id, game_id)
+
+
+def _chat(
+    messages: list[ChatMessage], game_id: str | None, selected_player: str | None, request_id: str
+) -> CoachReply:
     if not config.OPENAI_API_KEY:
         raise CoachConfigError("OPENAI_API_KEY is not configured")
 
@@ -511,6 +522,7 @@ def chat(messages: list[ChatMessage], game_id: str | None, selected_player: str 
         else:
             response = _complete(client, conversation, kwargs)
 
+        llm_log.log_call(request_id, iteration, game_id, conversation, kwargs.get("tools"), response)
         if not response.choices:
             raise CoachError("Empty LLM response")
         message = response.choices[0].message

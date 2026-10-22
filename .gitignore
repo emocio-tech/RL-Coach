@@ -1,5 +1,6 @@
 # Données (replays, JSON générés) et binaire rrrocket : jamais versionnés
 data/
+logs/
 backend/bin/
 *.replay
 
