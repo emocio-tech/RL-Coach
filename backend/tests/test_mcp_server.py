@@ -1,19 +1,23 @@
 import asyncio
+import json
 
 import pytest
 
 from app import config
 from app.mcp_server import (
+    INSTRUCTIONS,
     compare_players,
     get_match_events,
     get_match_summary,
     get_player_heatmap,
     get_player_stats,
+    import_replay,
     list_games,
     mcp,
     suggest_training,
 )
-from app.services import stats
+from app.services import coach, stats, storage
+from tests.conftest import FOLDER_NAME
 
 GAME_ID = "Stadium_P_Online-1v1_abc"
 
@@ -28,10 +32,11 @@ def game(games_dir, fake_raw):
     return GAME_ID
 
 
-def test_server_exposes_the_seven_tools():
+def test_server_exposes_the_eight_tools():
     tools = asyncio.run(mcp.list_tools())
     assert {tool.name for tool in tools} == {
         "list_games",
+        "import_replay",
         "get_match_summary",
         "get_player_stats",
         "compare_players",
@@ -43,6 +48,61 @@ def test_server_exposes_the_seven_tools():
 
 def test_list_games_empty_without_import(games_dir):
     assert list_games() == []
+
+
+def test_list_games_description_mentions_import_replay():
+    tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    assert "import_replay" in tools["list_games"].description
+
+
+def test_server_instructions_mention_import_replay():
+    assert "import_replay" in INSTRUCTIONS
+    assert "import_replay" in mcp.instructions
+
+
+def test_import_replay_tool_requires_file_path():
+    tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
+    assert tools["import_replay"].input_schema["required"] == ["file_path"]
+
+
+def test_import_replay_tool_imports_file_via_server(games_dir, fake_raw, monkeypatch, tmp_path):
+    monkeypatch.setattr(storage.parser, "parse_replay", lambda content: fake_raw)
+    source = tmp_path / "game.replay"
+    source.write_bytes(b"REPLAYDATA")
+
+    result = asyncio.run(mcp.call_tool("import_replay", {"file_path": str(source)}))
+
+    assert not result.is_error
+    assert json.loads(result.content[0].text) == {"game_id": FOLDER_NAME, "already_imported": False}
+    assert [g["id"] for g in list_games()] == [FOLDER_NAME]
+    assert source.read_bytes() == b"REPLAYDATA"
+
+
+def test_import_replay_function_reports_already_imported(games_dir, fake_raw, monkeypatch, tmp_path):
+    monkeypatch.setattr(storage.parser, "parse_replay", lambda content: fake_raw)
+    source = tmp_path / "game.replay"
+    source.write_bytes(b"REPLAYDATA")
+    import_replay(str(source))
+    assert import_replay(str(source)) == {"game_id": FOLDER_NAME, "already_imported": True}
+
+
+def test_import_replay_tool_relative_path_returns_error(games_dir):
+    assert import_replay("game.replay") == {"error": "Chemin absolu requis."}
+
+
+def test_import_replay_tool_missing_file_returns_error(games_dir, tmp_path):
+    assert import_replay(str(tmp_path / "nope.replay")) == {"error": "Fichier introuvable."}
+
+
+def test_import_replay_tool_wrong_extension_returns_error(games_dir, tmp_path):
+    other = tmp_path / "game.txt"
+    other.write_bytes(b"x")
+    assert import_replay(str(other)) == {"error": "Seuls les fichiers .replay sont acceptés."}
+
+
+def test_import_replay_tool_delegates_to_coach(monkeypatch):
+    monkeypatch.setattr(coach, "import_replay", lambda file_path: {"echo": file_path})
+    assert import_replay("X") == {"echo": "X"}
 
 
 def test_list_games_returns_imported_game(game):
