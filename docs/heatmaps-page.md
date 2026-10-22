@@ -71,10 +71,9 @@ Le rapport des stats (`GET /api/replays/{game_id}/stats`) est décrit dans `docs
 `Heatmap` contient `x_min`, `x_max`, `y_min`, `y_max` et `counts` (liste de listes d'entiers).
 
 **Provenance des données** (`storage.get_game_heatmaps`)
-- **Fichier à jour** (`ball_heatmap` présent) : les heatmaps des joueurs (`PlayerMap.heatmap`) et du ballon (`ball_heatmap`), calculées à l'import sans les temps morts, sont relues telles quelles.
-- **Ancien fichier** (`ball_heatmap` absent) : toutes les heatmaps sont recalculées à chaque appel à partir des trajectoires (`track` des joueurs et `ball`), sans les temps morts. Les heatmaps de joueurs stockées dans un tel fichier comptent encore les temps morts et sont donc ignorées. Aucune migration n'est nécessaire.
+Les heatmaps des joueurs et du ballon, calculées à l'import sans les temps morts, sont stockées dans `heatmap.json` (`HeatmapFile`) et relues telles quelles. `3dmatch.json` n'est pas lu. Les anciens dossiers (avec `map.json`) ne sont plus lus et ne sont pas migrés.
 
-Aucune écriture et aucun appel externe : lecture de `map.json` seule.
+Aucune écriture et aucun appel externe : lecture de `heatmap.json` seule.
 
 **Page**
 - Titre « Heatmaps », puis une grille à deux colonnes égales (`.heatmap-grid`, `frontend/src/styles.css`).
@@ -98,7 +97,7 @@ Aucune écriture et aucun appel externe : lecture de `map.json` seule.
 
 | Condition | Comportement |
 |---|---|
-| `game_id` invalide, `map.json` absent, ou `map.json` non valide pour le schéma (`ValueError` ou `OSError`) | Le service retourne `None`, la route répond **404** `{"detail": "Heatmap data not found"}`. |
+| `game_id` invalide, `heatmap.json` absent, ou `heatmap.json` non valide pour le schéma (`ValueError` ou `OSError`) | Le service retourne `None`, la route répond **404** `{"detail": "Heatmap data not found"}`. |
 | Échec de la requête côté page | « Impossible de charger les heatmaps de cette partie (<erreur>). Réessaie en rouvrant la partie. » (`role="alert"`). |
 | Chargement en cours | « Chargement des heatmaps… ». |
 | Joueur sélectionné absent des heatmaps | « Pas de données de position pour <joueur>. » à la place de sa carte. La carte du ballon reste affichée. |
@@ -108,9 +107,9 @@ Aucune écriture et aucun appel externe : lecture de `map.json` seule.
 ### Éléments surprenants
 - **Orientation : cage bleue à gauche, pour tous les joueurs.** L'axe long (y) est à l'horizontale, l'extrémité négative (cage bleue) à gauche. La carte d'un joueur orange n'est pas retournée. Même convention que la page Positionnement (`docs/positioning-page.md`).
 - **Indices inversés par rapport au dessin.** `ix` (axe court) donne la ligne et `iy` (axe long) la colonne (`heatmapGeometry.js`).
-- **Relues, avec repli.** Pour un import récent, les cartes sont relues dans `map.json`. Elles ne sont recalculées à chaque appel que pour les anciens `map.json` qui n'ont pas `ball_heatmap`. Réimporter la partie (après suppression de son dossier) les stocke.
-- **`ball_heatmap` ne porte pas de version.** Un fichier écrit par une version intermédiaire du code, qui stockait `ball_heatmap` sans écarter les temps morts, est relu tel quel : il faut le réimporter (ou recalculer ses heatmaps depuis ses trajectoires) pour qu'il en profite.
-- **Un `map.json` ancien et invalide donne un 404**, pas une 500 : le `ValueError` de validation est capturé. `get_game_tracks` a le même comportement.
+- **Relues, sans repli.** Les cartes sont relues dans `heatmap.json`, jamais recalculées. Un ancien dossier (sans `heatmap.json`) donne un 404 : il faut supprimer son dossier puis réimporter la partie.
+- **`heatmap.json` ne porte pas de version.** Un fichier écrit par une version intermédiaire du code, qui ne retirait pas les temps morts, est relu tel quel : il faut le réimporter pour qu'il en profite.
+- **Un `heatmap.json` invalide donne un 404**, pas une 500 : le `ValueError` de validation est capturé. `get_game_tracks` a le même comportement.
 - **Lissage avant la couleur.** Les comptes sont clairsemés (la médiane est de quelques échantillons par case) : colorés tels quels, deux cases voisines auraient des couleurs sans rapport, comme semées au hasard. La densité est donc lissée (gaussienne de 0,5 case, `SMOOTH_SIGMA`, renormalisée aux bords : assez pour relier les échantillons d'une trajectoire sans étaler la chaleur sur les zones voisines ; en dessous, vers 0,4, l'interpolation bicubique fait apparaître des anneaux et des trous autour des points chauds) puis interpolée en bicubique (Catmull-Rom, `sampleCubic`) en chaque pixel de l'image, et c'est cette valeur continue qui est coloriée, pixel par pixel. Colorier après lissage garde les transitions de couleur franches, alors que flouter l'image coloriée mélangeait le cyan et le rouge en vert boueux, et que des rectangles par case donnaient un rendu pixellisé. Le chat (`HeatmapChart` sans `bare`) profite du même rendu.
 - **Échelle sur le 98ᵉ centile.** Le haut de l'échelle de couleurs est le 98ᵉ centile des cases du champ lissé (`SCALE_PERCENTILE`, `heatScale`), pas le maximum : les cases plus chargées saturent. Un point chaud isolé n'écrase donc pas le reste de la carte.
 - **Courbe de couleur en puissance.** Le rapport entre une valeur et l'échelle ne donne pas directement la couleur : il est élevé à la puissance 1,8 (`HEAT_GAMMA`, `heatRatio`). Une zone voisine d'une zone très fréquentée retombe ainsi plus vite vers le bleu sombre qu'avec une courbe linéaire, les trajectoires se détachent comme des lignes et le rendu reste net. Par exemple, une valeur à la moitié de l'échelle donne un rapport d'environ 0,29, dans la moitié froide de la rampe, pas au milieu. La valeur est un compromis. Un chemin suivi une seule fois par le ballon pèse typiquement environ un quart de l'échelle : à 2,5 son rapport tombait à 0,03, presque sur la couleur de fond, et les trajectoires semblaient coupées ; à 1,8 il est de 0,08, assez pour sortir du fond. À 1,4, le fond se remplit et l'image redevient molle.
@@ -124,7 +123,7 @@ Aucune écriture et aucun appel externe : lecture de `map.json` seule.
   - **Équipe bleue.** Du bleu sombre du fond à un turquoise-vert lumineux, en six couleurs, fond compris : fond, bleu, azur, cyan, turquoise, turquoise-vert. La luminosité (luma) augmente à chaque couleur (23, 67, 106, 147, 186, 218) pendant que la teinte se réchauffe, de 230° (bleu) à 143° (turquoise-vert). La teinte ne remonte jamais le long de la rampe.
   - **Équipe orange.** Construite comme la bleue : du fond du terrain à un brun-rouge sombre qui tire légèrement vers le violet (344°), puis un rouge, un orange moyen et un jaune-orangé vif, en sept couleurs, fond compris. La luminosité (luma) augmente à chaque couleur (23, 42, 60, 79, 121, 164, 205, et la luminosité HSL aussi) pendant que la teinte se réchauffe de 344° à 45°. Elle ne contient aucun vert, donc ne peut pas tourner à l'olive. Au début, le fondu depuis le fond bleu nuit passe par un violet sombre ; les zones peu fréquentées ressortent donc en braise sombre, comme les zones peu fréquentées du bleu ressortent en bleu sombre.
 - **Correspondance joueur par nom exact** (`===`, casse respectée) sur la page. Le chat passe par `storage.get_player_heatmap`, qui ignore la casse et les espaces autour du nom.
-- **Le chat affiche la même heatmap que la page, avec les mêmes calculs et les mêmes couleurs.** Côté données, l'outil `show_heatmap` du coach appelle `storage.get_player_heatmap`, construit sur `get_game_heatmaps` : la carte du chat est celle de la page, temps morts écartés, et recalculée pour un ancien `map.json` (avant, le chat lisait la carte stockée telle quelle, qui comptait encore les temps morts dans un ancien fichier). Côté rendu, le chat utilise le même `HeatmapChart` (`ChatBubble.jsx`), donc les mêmes fonctions de `heatmapGeometry.js` : lissage, interpolation, échelle, courbe, opacité et rampe de l'équipe. Seule la mise en page diffère : sans la prop `bare`, le composant rend le bloc compact historique du chat. Le résumé par zones du chat (`zones_pct`) vient des stats du joueur, pas de la heatmap.
+- **Le chat affiche la même heatmap que la page, avec les mêmes calculs et les mêmes couleurs.** Côté données, l'outil `show_heatmap` du coach appelle `storage.get_player_heatmap`, construit sur `get_game_heatmaps` : la carte du chat est celle de la page, temps morts écartés, lue dans `heatmap.json`. Côté rendu, le chat utilise le même `HeatmapChart` (`ChatBubble.jsx`), donc les mêmes fonctions de `heatmapGeometry.js` : lissage, interpolation, échelle, courbe, opacité et rampe de l'équipe. Seule la mise en page diffère : sans la prop `bare`, le composant rend le bloc compact historique du chat. Le résumé par zones du chat (`zones_pct`) vient des stats du joueur, pas de la heatmap.
 - **Rechargement.** Les heatmaps sont rechargées au changement de `report.id`, avec une garde `cancelled` contre les réponses tardives. Changer de joueur ne refait pas d'appel : tout est déjà dans la réponse.
 
 ### Périmètre et limites
@@ -139,8 +138,7 @@ Aucune écriture et aucun appel externe : lecture de `map.json` seule.
   - Tooltips et valeurs au survol.
   - Deep link : la page est une route interne (`page === "heatmaps"` dans `App.jsx`), sans URL dédiée.
   - Filtre par période du match : les cartes couvrent toute la durée.
-  - Stockage de la heatmap du ballon.
 - **Limites** :
-  - Toutes les données viennent de `map.json` (échantillons, 5 Hz selon `docs/positioning-page.md`). Sans lui, la route répond 404.
+  - Toutes les données viennent de `heatmap.json` (échantillons à 5 Hz, voir `docs/heatmap-file.md`). Sans lui, la route répond 404.
   - La grille 20×26 est grossière et fixée côté back.
-- **Dépendances** : `map.json` (`MapFile`, `BallTrack`, `PlayerMap`), `config.GAMES_DIR`, `config.MAP_FILENAME`, `GAME_ID_PATTERN`, FastAPI, React, `TEAM_NAMES` exporté par `Layout.jsx`, variables CSS du thème.
+- **Dépendances** : `heatmap.json` (`HeatmapFile`, `PlayerHeatmap`), `config.GAMES_DIR`, `config.HEATMAP_FILENAME`, `GAME_ID_PATTERN`, FastAPI, React, `TEAM_NAMES` exporté par `Layout.jsx`, variables CSS du thème.

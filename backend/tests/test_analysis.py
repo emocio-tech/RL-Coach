@@ -20,7 +20,7 @@ def _detail(report, name):
 
 
 def test_build_report_keeps_match_and_player_stats(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
 
     report = analysis.build_report(GAME_ID, stats_file, map_file)
 
@@ -32,7 +32,7 @@ def test_build_report_keeps_match_and_player_stats(files):
 
 
 def test_build_report_speed(files):
-    alice = _detail(analysis.build_report(GAME_ID, *files), "Alice")
+    alice = _detail(analysis.build_report(GAME_ID, *files[:2]), "Alice")
 
     assert alice.avg_speed == 500.0
     assert alice.slow_pct == 100.0
@@ -42,7 +42,7 @@ def test_build_report_speed(files):
 
 
 def test_build_report_zones_are_relative_to_team_side(files):
-    report = analysis.build_report(GAME_ID, *files)
+    report = analysis.build_report(GAME_ID, *files[:2])
 
     # Alice (team 0) is at y=-2000, Bob (team 1) at y=3000: both in their own third.
     assert _detail(report, "Alice").defensive_zone_pct == 100.0
@@ -51,7 +51,7 @@ def test_build_report_zones_are_relative_to_team_side(files):
 
 
 def test_build_report_ball_positioning(files):
-    report = analysis.build_report(GAME_ID, *files)
+    report = analysis.build_report(GAME_ID, *files[:2])
 
     assert _detail(report, "Alice").behind_ball_pct == 100.0
     assert _detail(report, "Bob").behind_ball_pct == 100.0
@@ -61,16 +61,16 @@ def test_build_report_ball_positioning(files):
 
 
 def test_build_report_exposes_ball_y_for_momentum(files):
-    _, map_file = files
+    _, map_file, _ = files
 
-    report = analysis.build_report(GAME_ID, *files)
+    report = analysis.build_report(GAME_ID, *files[:2])
 
     assert report.ball_y == map_file.ball.y
     assert report.sample_seconds == pytest.approx(1 / config.FRAME_SAMPLE_HZ)
 
 
 def test_build_report_player_without_position_has_empty_detail(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.players[1].track.x = [None] * len(map_file.ball.t)
 
     bob = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Bob")
@@ -81,7 +81,7 @@ def test_build_report_player_without_position_has_empty_detail(files):
 
 
 def test_build_report_without_map_file_gives_empty_details(files):
-    stats_file, _ = files
+    stats_file, _, _ = files
 
     report = analysis.build_report(GAME_ID, stats_file, None)
 
@@ -90,7 +90,7 @@ def test_build_report_without_map_file_gives_empty_details(files):
 
 
 def test_build_report_without_map_file_has_no_momentum(files):
-    stats_file, _ = files
+    stats_file, _, _ = files
 
     report = analysis.build_report(GAME_ID, stats_file, None)
 
@@ -99,7 +99,7 @@ def test_build_report_without_map_file_has_no_momentum(files):
 
 
 def test_build_report_without_ball_position_has_no_ball_stats(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.ball.x = [None] * len(map_file.ball.t)
 
     alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
@@ -110,7 +110,7 @@ def test_build_report_without_ball_position_has_no_ball_stats(files):
 
 
 def test_build_report_ignores_missing_speed_samples(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.players[0].track.speed[0] = None
 
     alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
@@ -119,7 +119,7 @@ def test_build_report_ignores_missing_speed_samples(files):
 
 
 def test_build_report_copies_events(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     stats_file.events = [
         MatchEvent(seconds=1.0, type="goal", player="Alice", team=0),
         MatchEvent(seconds=2.5, type="demolition", player="Bob", team=1, victim="Alice"),
@@ -131,11 +131,11 @@ def test_build_report_copies_events(files):
 
 
 def test_build_report_events_empty_when_stats_file_has_none(files):
-    assert analysis.build_report(GAME_ID, *files).events == []
+    assert analysis.build_report(GAME_ID, *files[:2]).events == []
 
 
 def test_build_report_keeps_events_without_map_file(files):
-    stats_file, _ = files
+    stats_file, _, _ = files
     stats_file.events = [MatchEvent(seconds=1.0, type="save", player="Bob", team=1)]
 
     report = analysis.build_report(GAME_ID, stats_file, None)
@@ -144,7 +144,7 @@ def test_build_report_keeps_events_without_map_file(files):
 
 
 def test_build_report_events_list_is_not_shared_with_stats_file(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     stats_file.events = [MatchEvent(seconds=1.0, type="goal", player="Alice", team=0)]
 
     report = analysis.build_report(GAME_ID, stats_file, map_file)
@@ -156,10 +156,11 @@ def test_build_report_events_list_is_not_shared_with_stats_file(files):
 def _write_game(games_dir, files, with_map=True):
     folder = games_dir / GAME_ID
     folder.mkdir(parents=True)
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
     if with_map:
-        (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+        (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+        (folder / config.HEATMAP_FILENAME).write_text(heatmap_file.model_dump_json(), encoding="utf-8")
 
 
 def test_get_stats_endpoint(client, files, games_dir):
@@ -196,7 +197,7 @@ def test_get_tracks_endpoint_without_map_file_returns_404(client, files, games_d
 
 def test_get_tracks_endpoint_with_old_map_format_returns_404(client, files, games_dir):
     _write_game(games_dir, files)
-    map_path = games_dir / GAME_ID / config.MAP_FILENAME
+    map_path = games_dir / GAME_ID / config.MATCH3D_FILENAME
     old_map = json.loads(map_path.read_text(encoding="utf-8"))
     for player in old_map["players"]:
         for key in ("qx", "qy", "qz", "qw"):
@@ -261,7 +262,7 @@ def test_get_stats_unknown_id_returns_404(client, game_id):
 
 
 def test_build_report_exposes_timeline_seconds_from_map_file(fake_raw):
-    stats_file, map_file = stats.build_match_files("abc", "game.replay", fake_raw)
+    stats_file, map_file, heatmap_file = stats.build_match_files("abc", "game.replay", fake_raw)
 
     report = analysis.build_report(GAME_ID, stats_file, map_file)
 
@@ -284,7 +285,7 @@ def test_get_stats_endpoint_legacy_map_json_without_timeline_seconds(client, fil
     import json
 
     _write_game(games_dir, files)
-    map_path = games_dir / GAME_ID / config.MAP_FILENAME
+    map_path = games_dir / GAME_ID / config.MATCH3D_FILENAME
     legacy = json.loads(map_path.read_text(encoding="utf-8"))
     del legacy["timeline_seconds"]
     map_path.write_text(json.dumps(legacy), encoding="utf-8")
@@ -296,7 +297,7 @@ def test_get_stats_endpoint_legacy_map_json_without_timeline_seconds(client, fil
 
 
 def test_positioning_series_have_ball_y_length(files):
-    report = analysis.build_report(GAME_ID, *files)
+    report = analysis.build_report(GAME_ID, *files[:2])
 
     for player in report.players:
         assert len(player.detail.y) == len(report.ball_y)
@@ -304,15 +305,15 @@ def test_positioning_series_have_ball_y_length(files):
 
 
 def test_positioning_y_reuses_player_track(files):
-    _, map_file = files
+    _, map_file, _ = files
 
-    alice = _detail(analysis.build_report(GAME_ID, *files), "Alice")
+    alice = _detail(analysis.build_report(GAME_ID, *files[:2]), "Alice")
 
     assert alice.y == map_file.players[0].track.y
 
 
 def test_positioning_y_is_none_where_player_is_absent(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.players[0].track.y[3] = None
 
     alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
@@ -322,7 +323,7 @@ def test_positioning_y_is_none_where_player_is_absent(files):
 
 
 def test_positioning_y_is_none_where_track_is_shorter_than_ball(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     track = map_file.players[0].track
     keep = 7
     for field in ("t", "x", "y", "z", "speed", "boost", "qx", "qy", "qz", "qw"):
@@ -337,7 +338,7 @@ def test_positioning_y_is_none_where_track_is_shorter_than_ball(files):
 
 
 def test_positioning_ball_distance_is_none_where_ball_is_unknown(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.ball.x[4] = None
 
     alice = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Alice")
@@ -347,7 +348,7 @@ def test_positioning_ball_distance_is_none_where_ball_is_unknown(files):
 
 
 def test_positioning_ball_distance_is_none_where_player_is_unknown(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     map_file.players[0].track.x[2] = None
 
     report = analysis.build_report(GAME_ID, stats_file, map_file)
@@ -357,19 +358,19 @@ def test_positioning_ball_distance_is_none_where_player_is_unknown(files):
 
 
 def test_positioning_ball_distance_is_rounded_to_one_decimal(files):
-    _, map_file = files
+    _, map_file, _ = files
     track = map_file.players[0].track
     ball = map_file.ball
     expected = math.dist((track.x[0], track.y[0], track.z[0]), (ball.x[0], ball.y[0], ball.z[0]))
 
-    alice = _detail(analysis.build_report(GAME_ID, *files), "Alice")
+    alice = _detail(analysis.build_report(GAME_ID, *files[:2]), "Alice")
 
     assert alice.ball_distance[0] == round(expected, 1)
     assert alice.ball_distance[0] != expected  # the raw distance is not already round
 
 
 def test_positioning_mean_of_ball_distance_matches_avg_ball_distance(files):
-    report = analysis.build_report(GAME_ID, *files)
+    report = analysis.build_report(GAME_ID, *files[:2])
 
     for player in report.players:
         known = [d for d in player.detail.ball_distance if d is not None]
@@ -377,7 +378,7 @@ def test_positioning_mean_of_ball_distance_matches_avg_ball_distance(files):
 
 
 def test_positioning_series_empty_without_map_file(files):
-    stats_file, _ = files
+    stats_file, _, _ = files
 
     detail = analysis.build_report(GAME_ID, stats_file, None).players[0].detail
 
@@ -386,7 +387,7 @@ def test_positioning_series_empty_without_map_file(files):
 
 
 def test_positioning_series_empty_for_player_without_track(files):
-    stats_file, map_file = files
+    stats_file, map_file, heatmap_file = files
     stats_file.players[1].name = "Ghost"
 
     ghost = _detail(analysis.build_report(GAME_ID, stats_file, map_file), "Ghost")

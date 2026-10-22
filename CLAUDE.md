@@ -31,7 +31,7 @@ RL-Coach/
 
 ## Flux
 1. Le front envoie un `.replay` (multipart) à `POST /api/replays`.
-2. Le back extrait les données via rrrocket, puis sauvegarde uniquement `stats.json` et `map.json` dans un dossier de `data/games/` (nom `<stade>_<mode>_<id replay>`, suffixe `_N` en cas de collision entre deux matchs différents ; un replay déjà importé, même `Id`, renvoie le dossier existant sans rien écrire) ; le `.replay` n'est jamais conservé.
+2. Le back extrait les données via rrrocket, puis sauvegarde uniquement `stats.json`, `3dmatch.json` (positions 3D, heatmaps) et `heatmap.json` (heatmaps seules) dans un dossier de `data/games/` (nom `<stade>_<mode>_<id replay>`, suffixe `_N` en cas de collision entre deux matchs différents ; un replay déjà importé, même `Id`, renvoie le dossier existant sans rien écrire) ; le `.replay` n'est jamais conservé.
 
 ## Coach IA
 - `POST /api/chat` (`routes/chat.py`, `schemas/chat.py`) : chat stateless, le front renvoie l'historique ; `services/coach.py` appelle le LLM (SDK OpenAI, function calling, 7 outils sans `game_id`, fixé côté serveur, plus `analyze_player_across_matches` qui lit toutes les parties importées).

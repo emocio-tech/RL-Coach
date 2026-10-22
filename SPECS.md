@@ -5,7 +5,7 @@
 - [Identité visuelle](#identité-visuelle)
 - [Import et stockage des replays](#import-et-stockage-des-replays)
   - [Fichier `stats.json`](#fichier-statsjson)
-  - [Fichier `map.json`](#fichier-mapjson)
+  - [Fichier `3dmatch.json`](#fichier-3dmatchjson)
 - [Écrans](#écrans)
   - [Structure des écrans](#structure-des-écrans)
   - [Écran d'accueil](#écran-daccueil)
@@ -34,7 +34,7 @@ L'interface est colorée et ludique. Elle reprend les couleurs de Rocket League,
 Les textes de l'interface s'adressent à l'utilisateur à la deuxième personne du singulier (par exemple « Tes stats », « Importe un nouveau replay »).
 
 ## Import et stockage des replays
-L'application ne conserve pas les fichiers de replay. À l'import, le back extrait du replay les données du match et les enregistre dans deux fichiers JSON, `stats.json` et `map.json`, placés dans un même dossier de `data/games/`. Le fichier `.replay` n'est pas sauvegardé : seuls les JSON sont conservés. Ils ne contiennent que les informations utiles à l'application et sont plus compacts que le replay d'origine. Voir [#6](https://github.com/emocio-tech/RL-Coach/issues/6).
+L'application ne conserve pas les fichiers de replay. À l'import, le back extrait du replay les données du match et les enregistre dans trois fichiers JSON, `stats.json`, `3dmatch.json` et `heatmap.json` (ce dernier ne contient que les heatmaps des joueurs et du ballon), placés dans un même dossier de `data/games/`. Le fichier `.replay` n'est pas sauvegardé : seuls les JSON sont conservés. Ils ne contiennent que les informations utiles à l'application et sont plus compacts que le replay d'origine. Voir [#6](https://github.com/emocio-tech/RL-Coach/issues/6).
 
 L'import a lieu quand l'utilisateur importe un nouveau fichier de replay depuis son ordinateur. Sélectionner une partie déjà importée dans le menu de l'écran d'accueil n'envoie aucun fichier. L'import se déroule ainsi :
 
@@ -56,7 +56,7 @@ Il se compose de deux parties.
 - les démolitions : nombre infligé et nombre reçu ;
 - le boost : nombre de petits boosts récupérés, nombre de gros boosts récupérés, boost consommé par minute et niveau moyen de boost dans le réservoir. Voir [#17](https://github.com/emocio-tech/RL-Coach/issues/17).
 
-### Fichier `map.json`
+### Fichier `3dmatch.json`
 Il décrit le déroulé du match dans le temps : position 3D, orientation, vitesse et niveau de boost de chaque joueur, ainsi que position de la balle. Il contient aussi l'état des boost pads : pour chaque pad, les instants où un joueur l'a ramassé et ceux où il est redevenu disponible ; un pad dont la position n'a pas pu être déterminée n'y figure pas. Un match déjà stocké n'est pas réécrit à un nouvel import : les parties importées avant l'ajout de ces données n'ont donc pas d'état de pads, et leurs pads restent allumés dans la rediffusion. Les positions des joueurs figurent uniquement dans ce fichier. Voir [#15](https://github.com/emocio-tech/RL-Coach/issues/15).
 
 ## Écrans
@@ -110,10 +110,10 @@ Chaque heatmap a sa propre échelle de couleurs :
 
 Chaque carte est comparée à elle-même : une même couleur n'a pas la même valeur d'une carte à l'autre. Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
 
-Les positions utilisées proviennent de `map.json`.
+Les positions utilisées proviennent de `3dmatch.json`.
 
 #### Écran Replay
-L'écran Replay rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `map.json`. Sa page s'intitule « Replay » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8) et, pour la frise, [#9](https://github.com/emocio-tech/RL-Coach/issues/9). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
+L'écran Replay rejoue la partie sélectionnée en 3D, à partir des positions et des orientations de `3dmatch.json`. Sa page s'intitule « Replay » et se compose de deux blocs : la rediffusion 3D, puis la frise du match. Voir [#8](https://github.com/emocio-tech/RL-Coach/issues/8) et, pour la frise, [#9](https://github.com/emocio-tech/RL-Coach/issues/9). Des améliorations sont suivies dans [#41](https://github.com/emocio-tech/RL-Coach/issues/41).
 
 Le premier bloc affiche le terrain, la balle et les voitures de tous les joueurs. Chaque voiture a la couleur de son équipe, l'orientation qu'elle avait dans la partie et le nom de son joueur au-dessus d'elle, affichage que l'utilisateur peut masquer. Quand une voiture est démolie, elle disparaît jusqu'à sa réapparition et une explosion rouge, plus petite que celle des buts, se déclenche à l'endroit de la démolition. Le terrain est le même pour toutes les cartes. Quand un joueur ramasse un boost pad, le pad clignote brièvement puis s'éteint. Il se rallume avec un petit flash quand le boost est de nouveau disponible. Quand un but est marqué, la balle disparaît et une explosion aux couleurs de l'équipe qui gagne le point se déclenche à l'endroit du but ; la balle réapparaît quand elle revient en jeu, au coup d'envoi.
 
@@ -158,7 +158,7 @@ Le bloc « Distance à la balle » présente la distance entre le joueur sélect
 
 Sur les deux graphiques, la molette de la souris zoome et dézoome sur l'axe du temps, autour de la position du pointeur, et cliquer puis glisser fait défiler le temps. Le zoom et le défilement sont synchronisés : les deux graphiques affichent toujours la même portion de la partie. Quand le zoom augmente, les graduations de temps se rapprochent (jusqu'à la seconde) pour rester lisibles. Dézoomer ramène au plus à la partie entière. Tant que le pointeur survole un graphique, la molette ne fait pas défiler la page.
 
-Les positions utilisées proviennent de `map.json`.
+Les positions utilisées proviennent de `3dmatch.json`.
 
 ## Maquettes
 Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de la frise de l'écran Replay et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
@@ -178,7 +178,7 @@ Pour un joueur choisi, l'application affiche des statistiques détaillées regro
 - le boost : niveau moyen, part du temps sans boost, boost consommé par minute, petits et gros boosts récupérés ;
 - les démolitions : nombre infligé et nombre reçu.
 
-Le déplacement et le positionnement sont calculés à partir de `map.json`.
+Le déplacement et le positionnement sont calculés à partir de `3dmatch.json`.
 
 ### Graphiques
 L'application présente trois graphiques :

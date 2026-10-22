@@ -15,7 +15,7 @@ Les valeurs de cet exemple sont illustratives, elles ne viennent pas d'un vrai r
 
 ## Description technique
 
-Le rapport servi par `GET /api/replays/{game_id}/stats` (champs, erreurs, mode sans `map.json`) est décrit dans `docs/replay-stats.md`. Ce document ne détaille que ce qui concerne la page : les deux séries ajoutées à `PlayerDetail` et les graphiques.
+Le rapport servi par `GET /api/replays/{game_id}/stats` (champs, erreurs, mode sans `3dmatch.json`) est décrit dans `docs/replay-stats.md`. Ce document ne détaille que ce qui concerne la page : les deux séries ajoutées à `PlayerDetail` et les graphiques.
 
 ### Entrées
 
@@ -63,10 +63,10 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
 ### Erreurs et cas limites
 | Condition | Comportement |
 |---|---|
-| `ball_y` de moins de 2 éléments (pas de `map.json`) | Position de la balle : « Pas de données de position pour cette partie. » |
+| `ball_y` de moins de 2 éléments (pas de `3dmatch.json`) | Position de la balle : « Pas de données de position pour cette partie. » |
 | `ball_distance` vide ou entièrement `null` | Distance : même message. |
 | `selectedPlayer` ne correspond à aucun joueur | Traité comme « aucun joueur sélectionné ». |
-| Joueur absent de `map.json` (`detail.y` = `[]`) | La légende s'affiche, mais aucune ligne n'est tracée. |
+| Joueur absent de `3dmatch.json` (`detail.y` = `[]`) | La légende s'affiche, mais aucune ligne n'est tracée. |
 | Durée totale nulle (1 seul échantillon) | Aucune graduation de temps. |
 
 ### Éléments surprenants
@@ -96,7 +96,7 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
   - Zoom sur l'axe vertical : seul l'axe du temps se zoome.
   - Marqueurs d'événements (buts, démolitions) sur ces graphiques : voir `docs/timeline-events.md` pour la frise de l'écran Replay.
 - **Limites** :
-  - Toutes les données viennent de `map.json` (5 Hz). Sans lui, la page affiche uniquement des messages d'absence de données.
+  - Toutes les données viennent de `3dmatch.json` (5 Hz). Sans lui, la page affiche uniquement des messages d'absence de données.
   - Un seul joueur à la fois pour la ligne de position et la distance.
   - Les composants JSX ne sont pas testés (pas de jsdom) : seules les fonctions pures de `chartGeometry.js` le sont (Vitest, `cd frontend; npm test`).
 - **Dépendances** : `GET /api/replays/{id}/stats` (`docs/replay-stats.md`), `analysis.build_report`, schémas `PlayerDetail` et `GameReport`, React, variables CSS du thème (`--blue`, `--orange`, `--bg`, `--muted`), `TEAM_NAMES` exporté par `Layout.jsx`.

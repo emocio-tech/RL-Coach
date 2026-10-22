@@ -47,12 +47,12 @@ def context_chars(conversation: list[dict], tools: list[dict] | None) -> dict[st
 
 
 def game_files(tool_name: str, game_id: str | None) -> list[str]:
-    """Files of data/games read by a tool (stats.json, plus map.json when the game has one)."""
+    """Files of data/games read by a tool (stats.json, plus 3dmatch.json when the game has one)."""
     if not game_id or tool_name in TOOLS_WITHOUT_FILES:
         return []
     return [
         f"data/games/{game_id}/{filename}"
-        for filename in (config.STATS_FILENAME, config.MAP_FILENAME)
+        for filename in (config.STATS_FILENAME, config.MATCH3D_FILENAME)
         if (config.GAMES_DIR / game_id / filename).is_file()
     ]
 

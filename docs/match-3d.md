@@ -36,7 +36,7 @@ Quand le joueur Pseudo est démoli (valeurs `null`), sa voiture disparaît de la
 | `game_id` | chemin | oui | Nom d'un dossier de `data/games/` respectant `GAME_ID_PATTERN` (`backend/app/services/storage.py`). |
 
 ### Sorties
-`MatchTracks` (`backend/app/schemas/replay.py`), construit par `storage.get_game_tracks` à partir de `stats.json` et `map.json`, sans les heatmaps (elles passent par `GET /api/replays/{game_id}/heatmaps`, voir `docs/heatmaps-page.md`).
+`MatchTracks` (`backend/app/schemas/replay.py`), construit par `storage.get_game_tracks` à partir de `stats.json` et `3dmatch.json`, sans les heatmaps (elles passent par `GET /api/replays/{game_id}/heatmaps`, voir `docs/heatmaps-page.md`).
 
 | Champ | Contenu |
 |---|---|
@@ -46,14 +46,14 @@ Quand le joueur Pseudo est démoli (valeurs `null`), sa voiture disparaît de la
 | `ball` | Temps `t` et position `x`, `y`, `z`. |
 | `pads[]` | Pads de boost localisés : `x`, `y` (position standard du pad), `big` (grand pad) et `pickups[]`, la liste triée des ramassages : `t` (secondes depuis le début du replay, comme `track.t`) et `back` (instant où le pad est de nouveau disponible, ou `null` s'il ne l'est pas avant le ramassage suivant ou la fin). Liste vide pour une partie importée avant cette fonction : un nouvel import d'un match déjà stocké ne réécrit rien (voir `replay-upload.md`), donc pour avoir les pads animés il faut d'abord supprimer le dossier du match dans `data/games/`, puis réimporter le replay. |
 
-`pads` vient de `map.json` (`MapFile.pads`) ; son absence dans un ancien `map.json` donne une liste vide, sans erreur. Une valeur `null` signifie que la position est inconnue (voiture démolie, par exemple).
+`pads` vient de `3dmatch.json` (`Match3DFile.pads`) ; son absence dans un ancien `3dmatch.json` donne une liste vide, sans erreur. Une valeur `null` signifie que la position est inconnue (voiture démolie, par exemple).
 
 ### Erreurs
 | Cas | Réponse |
 |---|---|
 | `game_id` invalide ou dossier inconnu | `404`, `{"detail": "Tracking data not found"}`. |
-| `map.json` absent | `404`, même message. |
-| `map.json` à l'ancien format (sans les orientations) | `404`, même message. Il faut réimporter le replay. |
+| `3dmatch.json` absent | `404`, même message. |
+| `3dmatch.json` à l'ancien format (sans les orientations) | `404`, même message. Il faut réimporter le replay. |
 
 Dans ces trois cas, le front affiche le message à la place de la rediffusion.
 

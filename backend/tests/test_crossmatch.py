@@ -64,7 +64,7 @@ def _goal_games(goals):
 
 
 def _write_game(games_dir, fake_raw, game_id, date, goals=3, team_size=1, with_map=True, rename_alice=None):
-    stats_file, map_file = stats.build_match_files(game_id, "g.replay", fake_raw)
+    stats_file, map_file, _ = stats.build_match_files(game_id, "g.replay", fake_raw)
     stats_file.match.date = date
     stats_file.match.team_size = team_size
     for player in stats_file.players:
@@ -76,7 +76,7 @@ def _write_game(games_dir, fake_raw, game_id, date, goals=3, team_size=1, with_m
     folder.mkdir(parents=True)
     (folder / config.STATS_FILENAME).write_text(stats_file.model_dump_json(), encoding="utf-8")
     if with_map:
-        (folder / config.MAP_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
+        (folder / config.MATCH3D_FILENAME).write_text(map_file.model_dump_json(), encoding="utf-8")
     return folder
 
 
@@ -154,7 +154,7 @@ def test_analyze_player_aggregates_stored_games(games_dir, fake_raw):
     assert result["games_analyzed"] == 2
     assert result["totals"]["goals"] == 4
     assert result["averages"]["goals"] == 2.0
-    assert result["averages"]["avg_speed"] is not None  # positioning comes from map.json
+    assert result["averages"]["avg_speed"] is not None  # positioning comes from 3dmatch.json
     assert result["modes"] == {"games_by_team_size": {"1": 2}}
 
 

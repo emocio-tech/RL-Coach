@@ -50,9 +50,9 @@ Le joueur de cet exemple passe 54,6 % du temps dans son tiers défensif et 32,6 
 |---|---|
 | `id`, `original_filename`, `match` | Repris de `stats.json`. |
 | `players[].stats` | Stats de base, démolitions et boost de `stats.json`. |
-| `players[].detail` (`PlayerDetail`) | Stats calculées à partir de `map.json`, voir ci-dessous. |
-| `ball_y` | Position de la balle sur l'axe long du terrain, un échantillon par pas de temps (`null` quand elle est inconnue). Vide sans `map.json`. |
-| `sample_seconds` | Durée entre deux échantillons (`1 / FRAME_SAMPLE_HZ`, soit 0,2 s). `null` sans `map.json`. |
+| `players[].detail` (`PlayerDetail`) | Stats calculées à partir de `3dmatch.json`, voir ci-dessous. |
+| `ball_y` | Position de la balle sur l'axe long du terrain, un échantillon par pas de temps (`null` quand elle est inconnue). Vide sans `3dmatch.json`. |
+| `sample_seconds` | Durée entre deux échantillons (`1 / FRAME_SAMPLE_HZ`, soit 0,2 s). `null` sans `3dmatch.json`. |
 
 #### `PlayerDetail`
 Toutes les parts sont en pourcentage, arrondies à 0,1. Un champ vaut `null` quand il n'y a aucun échantillon exploitable.
@@ -73,12 +73,12 @@ Toutes les parts sont en pourcentage, arrondies à 0,1. Un champ vaut `null` qua
 | Cas | Réponse |
 |---|---|
 | `game_id` invalide ou dossier inconnu | `404`, `{"detail": "Replay not found"}`. |
-| `map.json` absent | `200` : les `detail` sont vides (`tracked_time_s` à 0, le reste à `null`), `ball_y` vide, `sample_seconds` à `null`. |
+| `3dmatch.json` absent | `200` : les `detail` sont vides (`tracked_time_s` à 0, le reste à `null`), `ball_y` vide, `sample_seconds` à `null`. |
 
 ### Affichage
 Le momentum et le radar sont dessinés par le front (`frontend/src/components/Charts.jsx`, section `StyleSection` de `frontend/src/pages/OverviewPage.jsx`) à partir de ce rapport. Le momentum utilise `ball_y` : une balle côté positif de y indique une pression de l'équipe bleue. Le radar compare les joueurs sur la vitesse moyenne, le boost moyen, `supersonic_pct`, `first_man_pct` et `behind_ball_pct`. Le back ne calcule aucune normalisation : le front ramène chaque axe au meilleur joueur de la partie (100 % = maximum de l'axe). Ces maxima sont calculés sur tous les joueurs, y compris ceux masqués via la légende, et sont les mêmes dans la vue « un graphique par joueur » : l'échelle reste stable quand on masque ou réaffiche un joueur. Les couleurs (palette froide pour l'équipe bleue, chaude pour l'orange) et le masquage sont purement côté front.
 
 ### Périmètre et limites
-- Les stats détaillées sont calculées à chaque appel, à partir de `stats.json` et `map.json`. Rien n'est stocké en plus.
+- Les stats détaillées sont calculées à chaque appel, à partir de `stats.json` et `3dmatch.json`. Rien n'est stocké en plus.
 - Pas de modèle de voiture. Les événements datés (buts, tirs, démolitions…) sont décrits dans `docs/timeline-events.md`.
 - Pas de route pour lister les parties déjà importées.
