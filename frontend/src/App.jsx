@@ -5,6 +5,7 @@ import Layout from "./components/Layout.jsx";
 import { sortPlayers } from "./components/playerOrder.js";
 import ReplayPicker from "./components/ReplayPicker.jsx";
 import ReplayUpload from "./components/ReplayUpload.jsx";
+import HeatmapsPage from "./pages/HeatmapsPage.jsx";
 import OverviewPage from "./pages/OverviewPage.jsx";
 import PositioningPage from "./pages/PositioningPage.jsx";
 
@@ -107,6 +108,8 @@ export default function App() {
           </Suspense>
         ) : page === "positioning" ? (
           <PositioningPage report={report} selectedPlayer={selectedPlayer} />
+        ) : page === "heatmaps" ? (
+          <HeatmapsPage report={report} selectedPlayer={selectedPlayer} />
         ) : (
           <OverviewPage report={report} selectedPlayer={selectedPlayer} onSelectPlayer={setSelectedPlayer} />
         )}

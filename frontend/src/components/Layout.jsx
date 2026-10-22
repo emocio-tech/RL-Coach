@@ -82,6 +82,7 @@ const NAV_ICONS = {
   overview: <><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></>,
   match3d: <><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></>,
   positioning: <><path d="M3 17l5-6 4 3 5-8 4 5" /><path d="M3 21h18" /></>,
+  heatmaps: <><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z" /><path d="M9 4v14" /><path d="M15 6v14" /></>,
 };
 
 function NavLink({ id, page, onNavigate, disabled, children }) {
@@ -119,6 +120,7 @@ export default function Layout({ page, onNavigate, players, selectedPlayer, onSe
             <span id="nav-flow" className="nav-title">Déroulé</span>
             <NavLink id="match3d" page={page} onNavigate={onNavigate}>Replay</NavLink>
             <NavLink id="positioning" page={page} onNavigate={onNavigate}>Positionnement</NavLink>
+            <NavLink id="heatmaps" page={page} onNavigate={onNavigate}>Heatmaps</NavLink>
           </div>
         </nav>
         <main className="content">{children}</main>

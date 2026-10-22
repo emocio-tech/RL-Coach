@@ -14,8 +14,9 @@ from app import config
 from app.schemas.replay import (
     GameReport,
     MapFile,
+    MatchHeatmaps,
     MatchTracks,
-    PlayerMap,
+    PlayerHeatmap,
     PlayerTrackSet,
     ReplaySummary,
     StatsFile,
@@ -151,16 +152,18 @@ def _write_match_folder(folder_name: str, stats_file, map_file) -> str:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
 
-def get_player_map(game_id: str, player_name: str) -> PlayerMap | None:
-    """Heatmap and track of one player (name compared ignoring case), or None if unavailable."""
-    if not GAME_ID_PATTERN.fullmatch(game_id):
+def get_player_heatmap(game_id: str, player_name: str) -> PlayerHeatmap | None:
+    """Heatmap of one player (name compared ignoring case and surrounding spaces), or None if unavailable.
+
+    It is the very heatmap the Heatmaps page shows: it goes through `get_game_heatmaps`, so the chat and the page
+    can never differ (dead-ball samples left out, old map.json files recomputed).
+    """
+    heatmaps = get_game_heatmaps(game_id)
+    if heatmaps is None:
         return None
-    map_path = config.GAMES_DIR / game_id / config.MAP_FILENAME
-    if not map_path.is_file():
-        return None
-    map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
     wanted = player_name.strip().casefold()
-    return next((p for p in map_file.players if p.name.casefold() == wanted), None)
+    return next((p for p in heatmaps.players if p.name.casefold() == wanted), None)
+
 
 def list_games() -> list[ReplaySummary]:
     """Imported games, most recent import first. The import date is the mtime of stats.json."""
@@ -237,6 +240,42 @@ def iter_game_reports(team_size: int | None = None) -> Iterator[tuple[str, GameR
         if team_size is not None and report.match.team_size != team_size:
             continue
         yield folder.name, report
+
+
+def get_game_heatmaps(game_id: str) -> MatchHeatmaps | None:
+    """Heatmaps of every player and of the ball (read from map.json), or None if unavailable.
+
+    The import step stores them, without the dead-ball samples. An older map.json has no stored ball
+    heatmap (and its player heatmaps still count the dead-ball samples): every heatmap is then recomputed
+    from the tracks on each call.
+    """
+    if not GAME_ID_PATTERN.fullmatch(game_id):
+        return None
+    map_path = config.GAMES_DIR / game_id / config.MAP_FILENAME
+    if not map_path.is_file():
+        return None
+    try:
+        map_file = MapFile.model_validate_json(map_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    ball = map_file.ball
+    if map_file.ball_heatmap is not None:
+        return MatchHeatmaps(
+            players=[PlayerHeatmap(name=p.name, team=p.team, heatmap=p.heatmap) for p in map_file.players],
+            ball=map_file.ball_heatmap,
+        )
+    dead_ball = stats.dead_ball_mask(ball.x, ball.y, ball.z)
+    return MatchHeatmaps(
+        players=[
+            PlayerHeatmap(
+                name=p.name,
+                team=p.team,
+                heatmap=stats.heatmap_from_points(p.track.x, p.track.y, skip=dead_ball),
+            )
+            for p in map_file.players
+        ],
+        ball=stats.heatmap_from_points(ball.x, ball.y, skip=dead_ball),
+    )
 
 
 def get_game_report(game_id: str) -> GameReport | None:

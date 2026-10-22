@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile
 
-from app.schemas.replay import GameReport, MatchTracks, ReplaySummary, UploadResult
+from app.schemas.replay import GameReport, MatchHeatmaps, MatchTracks, ReplaySummary, UploadResult
 from app.services import storage
 
 router = APIRouter()
@@ -25,6 +25,14 @@ def get_game_tracks(game_id: str):
     if tracks is None:
         raise HTTPException(status_code=404, detail="Tracking data not found")
     return tracks
+
+
+@router.get("/{game_id}/heatmaps", response_model=MatchHeatmaps)
+def get_game_heatmaps(game_id: str):
+    heatmaps = storage.get_game_heatmaps(game_id)
+    if heatmaps is None:
+        raise HTTPException(status_code=404, detail="Heatmap data not found")
+    return heatmaps
 
 
 @router.get("/{game_id}/stats", response_model=GameReport)

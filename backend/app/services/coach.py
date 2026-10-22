@@ -470,11 +470,13 @@ def _run_tool(
     if error:
         return error
     if name == "show_heatmap":
-        player_map = storage.get_player_map(game_id, player.stats.name)
-        if player_map is None:
+        player_heatmap = storage.get_player_heatmap(game_id, player.stats.name)  # the one the Heatmaps page shows
+        if player_heatmap is None:
             return {"error": "Heatmap indisponible pour ce joueur."}
-        if heatmaps is not None and all(h.player != player_map.name for h in heatmaps):
-            heatmaps.append(ChatHeatmap(player=player_map.name, team=player_map.team, heatmap=player_map.heatmap))
+        if heatmaps is not None and all(h.player != player_heatmap.name for h in heatmaps):
+            heatmaps.append(
+                ChatHeatmap(player=player_heatmap.name, team=player_heatmap.team, heatmap=player_heatmap.heatmap)
+            )
         detail = player.detail
         return {
             "displayed": True,

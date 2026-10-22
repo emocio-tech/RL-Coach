@@ -52,6 +52,54 @@ X_MIN, X_MAX = -4096.0, 4096.0
 Y_MIN, Y_MAX = -5120.0, 5120.0
 
 
+# Dead ball: kickoff countdown, ball frozen in the net after a goal. Heatmaps ignore these samples,
+# otherwise the kickoff spot and the goal backs swamp the colour scale.
+DEAD_BALL_MAX_STEP = 5.0  # uu: max move between two samples (0.2 s) for the ball to count as still
+DEAD_BALL_MIN_SAMPLES = 10  # 2 s without moving
+
+
+def dead_ball_mask(xs, ys, zs) -> list[bool]:
+    """True for the samples inside a run of at least DEAD_BALL_MIN_SAMPLES where the ball does not move.
+
+    A missing position (None) breaks a run.
+    """
+    n = len(xs)
+    mask = [False] * n
+    i = 0
+    while i < n:
+        if xs[i] is None or ys[i] is None or zs[i] is None:
+            i += 1
+            continue
+        j = i
+        while (
+            j + 1 < n
+            and xs[j + 1] is not None
+            and ys[j + 1] is not None
+            and zs[j + 1] is not None
+            and math.dist((xs[j], ys[j], zs[j]), (xs[j + 1], ys[j + 1], zs[j + 1])) < DEAD_BALL_MAX_STEP
+        ):
+            j += 1
+        if j - i + 1 >= DEAD_BALL_MIN_SAMPLES:
+            mask[i : j + 1] = [True] * (j - i + 1)
+        i = j + 1
+    return mask
+
+
+def heatmap_from_points(xs, ys, skip=None) -> Heatmap:
+    """Bin positions into the heatmap grid (counts[ix][iy]).
+
+    Points with a None coordinate are ignored, and so are the points whose index is flagged in `skip`.
+    """
+    counts = [[0] * GRID_Y for _ in range(GRID_X)]
+    for i, (x, y) in enumerate(zip(xs, ys)):
+        if x is None or y is None or (skip is not None and i < len(skip) and skip[i]):
+            continue
+        ix = min(GRID_X - 1, max(0, int((x - X_MIN) / (X_MAX - X_MIN) * GRID_X)))
+        iy = min(GRID_Y - 1, max(0, int((y - Y_MIN) / (Y_MAX - Y_MIN) * GRID_Y)))
+        counts[ix][iy] += 1
+    return Heatmap(counts=counts)
+
+
 class _State:
     def __init__(self):
         self.cars = set()
@@ -512,21 +560,26 @@ def build_match_files(
             )
         )
 
+    ball = BallTrack(
+        t=times,
+        x=[r[0] if r else None for r in ball_rows],
+        y=[r[1] if r else None for r in ball_rows],
+        z=[r[2] if r else None for r in ball_rows],
+    )
+    dead_ball = dead_ball_mask(ball.x, ball.y, ball.z)
+
     players = []
     for stats_item in stats_list:
         rows = player_rows[stats_item.name]
-        counts = [[0] * GRID_Y for _ in range(GRID_X)]
-        for row in rows:
-            if row is None:
-                continue
-            ix = min(GRID_X - 1, max(0, int((row[0] - X_MIN) / (X_MAX - X_MIN) * GRID_X)))
-            iy = min(GRID_Y - 1, max(0, int((row[1] - Y_MIN) / (Y_MAX - Y_MIN) * GRID_Y)))
-            counts[ix][iy] += 1
         players.append(
             PlayerMap(
                 name=stats_item.name,
                 team=stats_item.team,
-                heatmap=Heatmap(counts=counts),
+                heatmap=heatmap_from_points(
+                    [r[0] if r else None for r in rows],
+                    [r[1] if r else None for r in rows],
+                    skip=dead_ball,
+                ),
                 track=PlayerTrack(
                     t=times,
                     x=[r[0] if r else None for r in rows],
@@ -541,13 +594,6 @@ def build_match_files(
                 ),
             )
         )
-
-    ball = BallTrack(
-        t=times,
-        x=[r[0] if r else None for r in ball_rows],
-        y=[r[1] if r else None for r in ball_rows],
-        z=[r[2] if r else None for r in ball_rows],
-    )
 
     pad_tracks = [
         PadTrack(
@@ -599,6 +645,7 @@ def build_match_files(
         replay_id=replay_id,
         players=players,
         ball=ball,
+        ball_heatmap=heatmap_from_points(ball.x, ball.y, skip=dead_ball),
         timeline_seconds=timeline_seconds,
         pads=pad_tracks,
     )
