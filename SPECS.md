@@ -188,7 +188,7 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 - La conversation est conservée tant que la page n'est pas rechargée, y compris quand l'utilisateur change de page. Elle n'est pas sauvegardée au-delà.
 - L'utilisateur envoie son message avec le bouton « Envoyer » ou la touche Entrée. L'envoi est impossible si le champ est vide ou si une réponse est en cours. La réponse s'affiche en une fois.
 - Les 20 derniers messages sont pris en compte, chacun limité à 2000 caractères.
-- Quand une partie est ouverte, le coach s'appuie sur ses statistiques (résumé du match, statistiques d'un joueur, comparaison des joueurs) et ne donne aucun chiffre qu'il n'a pas lu. Il tient compte du joueur sélectionné.
+- Quand une partie est ouverte, le coach s'appuie sur ses statistiques (résumé du match, statistiques d'un joueur, comparaison des joueurs, analyse du style de jeu d'un joueur sur plusieurs parties importées, voir [#46](https://github.com/emocio-tech/RL-Coach/issues/46)) et ne donne aucun chiffre qu'il n'a pas lu. Il tient compte du joueur sélectionné.
 - Sans partie ouverte, le coach donne uniquement des conseils généraux, sans statistiques.
 - Le coach refuse les sujets sans rapport avec Rocket League.
 - En cas de problème (coach non configuré, indisponible ou trop lent), un message d'erreur en français s'affiche dans le panneau.
@@ -213,6 +213,7 @@ L'agent peut :
 - lire les statistiques détaillées d'un joueur, ou comparer tous les joueurs ;
 - retrouver les événements horodatés d'une partie (buts, passes décisives, tirs, arrêts, démolitions infligées et subies), pour tous les joueurs ou pour un seul ;
 - obtenir le temps passé par un joueur en zone défensive, milieu et offensive ;
+- analyser le style de jeu d'un joueur sur plusieurs parties (moyennes, détail par partie, tendance), avec filtre par mode et nombre de parties ([#46](https://github.com/emocio-tech/RL-Coach/issues/46)) ;
 - obtenir des entraînements pour un à trois axes de progression : boost, positionnement, rotation, défense, tir, vitesse, aériens, contrôle de balle.
 
 Le serveur est en lecture seule : il n'importe ni ne supprime de partie. Il n'offre pas de chat, car l'agent fait lui-même le coaching. Il se lance à la demande de l'agent.

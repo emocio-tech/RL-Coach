@@ -289,5 +289,6 @@ def test_tools_does_not_expose_import_replay_to_the_llm():
         "show_heatmap",
         "get_match_events",
         "suggest_training",
+        "analyze_player_across_matches",
     ]
     assert "import_replay" not in names

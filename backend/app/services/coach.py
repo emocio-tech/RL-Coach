@@ -9,7 +9,7 @@ from openai import OpenAI
 from app import config
 from app.schemas.chat import ChatHeatmap, ChatMessage, ChoicePrompt, ChoiceStep
 from app.schemas.replay import PlayerReport, PlayerStats
-from app.services import llm_log, storage, training
+from app.services import crossmatch, llm_log, storage, training
 from app.services.timeline import build_timeline_events
 
 
@@ -101,6 +101,12 @@ def build_system_prompt(game_id: str | None, selected_player: str | None) -> str
             "Pour chaque entraînement, donne le Rocket League Training Pack associé (nom et code) quand "
             "training_pack n'est pas vide ; sinon dis simplement qu'il n'y a pas de pack et que l'exercice se fait "
             "en entraînement libre. N'invente jamais de code de pack et reprends exactement ceux du résultat."
+        )
+        lines.append(
+            "Quand le joueur parle de plusieurs matchs (« sur plusieurs matchs », « mon évolution », « mon style en "
+            "général »), appelle analyze_player_across_matches (sans game_id : il porte sur les parties importées). "
+            "Ne cite que les chiffres du résultat, et mentionne toujours games_analyzed (nombre de parties prises en "
+            "compte) ainsi que les notes éventuelles (échantillon insuffisant, modes mélangés)."
         )
         if not selected_player:
             lines.insert(
@@ -245,9 +251,39 @@ TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "analyze_player_across_matches",
+            "description": (
+                "Analyse un joueur sur plusieurs parties importées (totaux, moyennes par partie, pourcentages de "
+                "positionnement, détail par partie et tendance récente). "
+                "À appeler quand le joueur parle de plusieurs matchs, de son évolution ou de son style en général."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "player_name": {
+                        "type": "string",
+                        "description": "Nom exact du joueur (par défaut : le joueur sélectionné).",
+                    },
+                    "team_size": {
+                        "type": "integer",
+                        "description": "Taille d'équipe pour ne garder qu'un mode (1, 2, 3...).",
+                    },
+                    "last_n": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": crossmatch.MAX_LAST_N,
+                        "description": f"Nombre de parties les plus récentes à analyser (défaut {crossmatch.MAX_LAST_N}).",
+                    },
+                },
+            },
+        },
+    },
 ]
 
-TOOL_NAMES = {tool["function"]["name"] for tool in TOOLS}
+TOOL_NAMES ={tool["function"]["name"] for tool in TOOLS}
 
 
 def _player_payload(player: PlayerReport) -> dict:
@@ -367,6 +403,28 @@ def _match_events(report, arguments: dict) -> dict:
     return result
 
 
+def _is_int(value) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _analyze_across_matches(arguments: dict, selected_player: str | None) -> dict:
+    """Validate the arguments of analyze_player_across_matches then run the cross-match analysis."""
+    player_name = arguments.get("player_name")
+    if player_name is None:
+        player_name = selected_player
+    if not isinstance(player_name, str) or not player_name.strip():
+        return {"error": "Argument player_name manquant ou invalide."}
+    team_size = arguments.get("team_size")
+    if team_size is not None and (not _is_int(team_size) or team_size < 1):
+        return {"error": "Argument team_size invalide : entier positif attendu."}
+    last_n = arguments.get("last_n")
+    if last_n is None:
+        last_n = crossmatch.MAX_LAST_N
+    if not _is_int(last_n) or not 1 <= last_n <= crossmatch.MAX_LAST_N:
+        return {"error": f"Argument last_n invalide : entier entre 1 et {crossmatch.MAX_LAST_N} attendu."}
+    return crossmatch.analyze_player(player_name, team_size, last_n)
+
+
 def _run_tool(
     name: str,
     arguments_json: str | None,
@@ -385,6 +443,8 @@ def _run_tool(
         return {"error": "Arguments invalides : un objet JSON est attendu."}
     if name == "suggest_training":
         return training.build_training_plan(arguments.get("focus_areas"))
+    if name == "analyze_player_across_matches":
+        return _analyze_across_matches(arguments, selected_player)
     if not game_id:
         return {"error": "Aucune partie ouverte."}
     report = storage.get_game_report(game_id)
