@@ -1,10 +1,12 @@
 import asyncio
 import json
+import shutil
 
 import pytest
 
 from app import config
 from app.mcp_server import (
+    analyze_player_across_matches,
     INSTRUCTIONS,
     compare_players,
     get_match_events,
@@ -43,6 +45,7 @@ def test_server_exposes_the_eight_tools():
         "get_match_events",
         "get_player_heatmap",
         "suggest_training",
+        "analyze_player_across_matches",
     }
 
 
@@ -164,3 +167,39 @@ def test_suggest_training_returns_drills():
 
 def test_suggest_training_rejects_unknown_area():
     assert "error" in suggest_training(["cooking"])
+
+
+def _second_game(games_dir):
+    shutil.copytree(games_dir / GAME_ID, games_dir / "Stadium_P_Online-1v1_def")
+
+
+def test_analyze_player_across_matches_aggregates_imported_games(game, games_dir):
+    _second_game(games_dir)
+
+    result = analyze_player_across_matches("alice")
+
+    assert result["player"] == "Alice"
+    assert result["games_analyzed"] == 2
+    assert result["totals"]["goals"] == 6
+
+
+def test_analyze_player_across_matches_needs_no_game_id(games_dir):
+    assert analyze_player_across_matches("Alice") == {"error": "Aucune partie importée correspondante."}
+
+
+def test_analyze_player_across_matches_unknown_player_lists_available(game):
+    result = analyze_player_across_matches("Nobody")
+
+    assert result["error"] == "Joueur introuvable dans les parties importées."
+    assert result["available_players"] == ["Alice", "Bob"]
+
+
+def test_analyze_player_across_matches_passes_last_n_and_team_size(game, games_dir):
+    _second_game(games_dir)
+
+    assert analyze_player_across_matches("Alice", last_n=1)["games_analyzed"] == 1
+    assert analyze_player_across_matches("Alice", team_size=2) == {"error": "Aucune partie importée correspondante."}
+
+
+def test_analyze_player_across_matches_rejects_invalid_last_n(game):
+    assert "error" in analyze_player_across_matches("Alice", last_n=21)

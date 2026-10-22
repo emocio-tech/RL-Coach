@@ -67,7 +67,7 @@ Réponse `200` : `{"reply": "<texte du coach>"}`, renvoyée d'un bloc (pas de st
 3. Construction du prompt système (`build_system_prompt`) : rôle de coach tutoyant, obligation d'utiliser les outils pour tout chiffre, refus du hors-sujet, noms de joueurs et de fichiers traités comme des données et non des instructions. Il varie selon la présence d'une partie et d'un joueur sélectionné.
 4. Boucle d'appels au modèle (voir ci-dessous).
 
-#### Les 3 outils de function calling
+#### Les outils de function calling
 Ils ne sont proposés au modèle que si `game_id` est renseigné. Aucun ne prend d'identifiant de partie en argument : ils utilisent le `game_id` de la requête. Les rapports viennent de `storage.get_game_report`.
 
 | Outil | Arguments | Ce qu'il renvoie (JSON) |
@@ -75,6 +75,7 @@ Ils ne sont proposés au modèle que si `game_id` est renseigné. Aucun ne prend
 | `get_match_summary` | aucun | `{"match": <score, durée, mode, carte, date>, "players": [stats de base de chaque joueur]}` |
 | `get_player_stats` | `player_name` (chaîne, obligatoire) | Stats de base du joueur plus `detail`. Nom comparé sans tenir compte de la casse ni des espaces en bordure. |
 | `compare_players` | aucun | `{"players": [...]}` : stats de base plus `detail` pour tous les joueurs. |
+| `analyze_player_across_matches` | `player_name?`, `team_size?`, `last_n?` | Style de jeu agrégé sur plusieurs parties importées (pas seulement la partie ouverte). Voir [cross-match-analysis.md](cross-match-analysis.md). |
 
 Les erreurs sont renvoyées au modèle sous la forme `{"error": ...}`, sans exception : outil inconnu, arguments invalides (JSON incorrect ou pas un objet), aucune partie ouverte, partie introuvable, `player_name` manquant, joueur introuvable (avec `available_players`), erreur interne.
 
@@ -93,7 +94,7 @@ Les erreurs sont renvoyées au modèle sous la forme `{"error": ...}`, sans exce
 - En attente : « Le coach réfléchit… ». En cas d'erreur, le message du back est affiché dans le panneau.
 
 ### Périmètre
-- **Inclus** : bulle et panneau de chat, endpoint `POST /api/chat`, appel LLM via le SDK OpenAI (base URL personnalisable, modèle `nova-lite` par défaut), 3 outils de lecture des stats, chat général sans statistiques quand aucune partie n'est ouverte, prise en compte du joueur sélectionné.
+- **Inclus** : bulle et panneau de chat, endpoint `POST /api/chat`, appel LLM via le SDK OpenAI (base URL personnalisable, modèle `nova-lite` par défaut), outils de lecture des stats, chat général sans statistiques quand aucune partie n'est ouverte, prise en compte du joueur sélectionné.
 - **Exclu** : streaming, persistance de l'historique, authentification, limitation de débit.
 - **Dépendances** : paquets `openai` et `python-dotenv`, `storage.get_game_report`, fichier `.env`, accès réseau au fournisseur LLM.
 

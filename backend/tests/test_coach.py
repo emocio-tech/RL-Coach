@@ -1,4 +1,5 @@
 import json
+import shutil
 from types import SimpleNamespace
 
 import httpx
@@ -183,12 +184,12 @@ def test_run_tool_never_raises_on_internal_failure(game, monkeypatch):
     assert result == {"error": "Erreur interne lors de l'exécution de l'outil."}
 
 
-def test_tools_declare_the_seven_expected_functions():
+def test_tools_declare_the_eight_expected_functions():
     names = [t["function"]["name"] for t in coach.TOOLS]
 
     assert names == [
         "get_match_summary", "get_player_stats", "compare_players", "choose_player", "show_heatmap",
-        "get_match_events", "suggest_training",
+        "get_match_events", "suggest_training", "analyze_player_across_matches",
     ]
 
 
@@ -1629,3 +1630,167 @@ def test_heatmap_reply_same_player_twice_gives_one_line():
     reply = coach._heatmap_reply(None, [result, result])
 
     assert reply == "Temps passé par zone :\n\n**Alice** : 60 % en zone défensive, 30 % au milieu, 10 % en zone offensive."
+
+
+# ---------- analyze_player_across_matches ----------
+
+SECOND_GAME_ID = "Stadium_P_Online-1v1_def"
+
+
+@pytest.fixture
+def two_games(game, games_dir):
+    shutil.copytree(games_dir / game, games_dir / SECOND_GAME_ID)
+    return game
+
+
+def _across(arguments, game_id=None, selected_player=None):
+    return json.loads(coach.run_tool("analyze_player_across_matches", json.dumps(arguments), game_id, None, selected_player))
+
+
+def test_analyze_across_matches_tool_declaration():
+    tool = next(t for t in coach.TOOLS if t["function"]["name"] == "analyze_player_across_matches")
+    parameters = tool["function"]["parameters"]
+
+    assert "required" not in parameters
+    assert set(parameters["properties"]) == {"player_name", "team_size", "last_n"}
+    assert parameters["properties"]["last_n"]["minimum"] == 1
+    assert parameters["properties"]["last_n"]["maximum"] == coach.crossmatch.MAX_LAST_N
+
+
+def test_run_tool_analyze_across_matches_nominal(two_games):
+    result = _across({"player_name": "Alice"}, two_games)
+
+    assert result["player"] == "Alice"
+    assert result["games_analyzed"] == 2
+    assert result["totals"]["goals"] == 6
+
+
+def test_run_tool_analyze_across_matches_works_without_game_id(two_games):
+    result = _across({"player_name": "Alice"}, None)
+
+    assert result["games_analyzed"] == 2
+
+
+def test_run_tool_analyze_across_matches_does_not_need_game_to_exist(two_games):
+    assert _across({"player_name": "Alice"}, "Missing_Game_1")["games_analyzed"] == 2
+
+
+def test_run_tool_analyze_across_matches_defaults_to_selected_player(two_games):
+    assert _across({}, two_games, selected_player="Bob")["player"] == "Bob"
+
+
+def test_run_tool_analyze_across_matches_explicit_name_overrides_selected_player(two_games):
+    assert _across({"player_name": "Bob"}, two_games, selected_player="Alice")["player"] == "Bob"
+
+
+def test_run_tool_analyze_across_matches_null_arguments_use_defaults(two_games):
+    result = _across({"player_name": "Alice", "team_size": None, "last_n": None}, two_games)
+
+    assert result["games_analyzed"] == 2
+
+
+def test_run_tool_analyze_across_matches_empty_arguments_string(two_games):
+    result = json.loads(coach.run_tool("analyze_player_across_matches", None, None, None, "Alice"))
+
+    assert result["games_analyzed"] == 2
+
+
+@pytest.mark.parametrize("arguments", [{}, {"player_name": ""}, {"player_name": "  "}, {"player_name": 42}])
+def test_run_tool_analyze_across_matches_player_name_missing_or_invalid(two_games, arguments):
+    assert _across(arguments) == {"error": "Argument player_name manquant ou invalide."}
+
+
+def test_run_tool_analyze_across_matches_unknown_player(two_games):
+    result = _across({"player_name": "Zed"})
+
+    assert result["error"] == "Joueur introuvable dans les parties importées."
+    assert result["available_players"] == ["Alice", "Bob"]
+
+
+def test_run_tool_analyze_across_matches_no_game_imported(games_dir):
+    assert _across({"player_name": "Alice"}) == {"error": "Aucune partie importée correspondante."}
+
+
+@pytest.mark.parametrize("team_size", [0, -1, "1", 1.5, True, [1]])
+def test_run_tool_analyze_across_matches_invalid_team_size(two_games, team_size):
+    result = _across({"player_name": "Alice", "team_size": team_size})
+
+    assert result == {"error": "Argument team_size invalide : entier positif attendu."}
+
+
+@pytest.mark.parametrize("last_n", [0, -3, 21, "5", 2.5, True])
+def test_run_tool_analyze_across_matches_invalid_last_n(two_games, last_n):
+    result = _across({"player_name": "Alice", "last_n": last_n})
+
+    assert result == {"error": "Argument last_n invalide : entier entre 1 et 20 attendu."}
+
+
+@pytest.mark.parametrize("last_n", [1, 20])
+def test_run_tool_analyze_across_matches_last_n_bounds_accepted(two_games, last_n):
+    assert "error" not in _across({"player_name": "Alice", "last_n": last_n})
+
+
+def test_run_tool_analyze_across_matches_team_size_filter(two_games):
+    assert _across({"player_name": "Alice", "team_size": 1})["games_analyzed"] == 2
+    assert _across({"player_name": "Alice", "team_size": 3}) == {"error": "Aucune partie importée correspondante."}
+
+
+def test_run_tool_analyze_across_matches_invalid_json():
+    result = json.loads(coach.run_tool("analyze_player_across_matches", "{not json", None))
+
+    assert result == {"error": "Arguments invalides : JSON incorrect."}
+
+
+def test_run_tool_analyze_across_matches_never_raises_on_internal_failure(two_games, monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("disk exploded")
+
+    monkeypatch.setattr(coach.crossmatch, "analyze_player", boom)
+
+    assert _across({"player_name": "Alice"}) == {"error": "Erreur interne lors de l'exécution de l'outil."}
+
+
+def test_chat_analyze_across_matches_then_reply(llm, two_games):
+    fake = llm([
+        _response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", '{"player_name": "alice"}')]),
+        _response(content="Sur 2 parties, 6 buts."),
+    ])
+
+    reply = coach.chat(_user("Mon évolution ?"), two_games, "Alice")
+
+    assert reply.reply == "Sur 2 parties, 6 buts."
+    assert any(t["function"]["name"] == "analyze_player_across_matches" for t in fake.calls[0]["tools"])
+    tool_msg = fake.calls[1]["messages"][-1]
+    assert tool_msg["role"] == "tool"
+    assert tool_msg["tool_call_id"] == "a1"
+    content = json.loads(tool_msg["content"])
+    assert content["games_analyzed"] == 2
+    assert content["totals"]["goals"] == 6
+
+
+def test_chat_analyze_across_matches_uses_selected_player_by_default(llm, two_games):
+    fake = llm([_response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", "{}")]), _response(content="Ok")])
+
+    coach.chat(_user(), two_games, "Bob")
+
+    assert json.loads(fake.calls[1]["messages"][-1]["content"])["player"] == "Bob"
+
+
+def test_chat_analyze_across_matches_error_is_sent_to_model(llm, two_games):
+    fake = llm([
+        _response(tool_calls=[_tool_call("a1", "analyze_player_across_matches", '{"player_name": "alice", "last_n": 99}')]),
+        _response(content="Je réessaie."),
+    ])
+
+    coach.chat(_user(), two_games, "Alice")
+
+    assert "last_n" in json.loads(fake.calls[1]["messages"][-1]["content"])["error"]
+
+
+def test_build_system_prompt_mentions_analyze_player_across_matches_with_game():
+    assert "analyze_player_across_matches" in coach.build_system_prompt(GAME_ID, None)
+    assert "analyze_player_across_matches" in coach.build_system_prompt(GAME_ID, "Alice")
+
+
+def test_build_system_prompt_no_analyze_player_across_matches_without_game():
+    assert "analyze_player_across_matches" not in coach.build_system_prompt(None, None)

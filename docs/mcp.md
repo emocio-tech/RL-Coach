@@ -31,6 +31,7 @@ Le serveur expose 8 outils. Chacun renvoie un objet JSON ; une erreur est un obj
 | `compare_players` | `game_id` | Stats complètes de tous les joueurs. |
 | `get_match_events` | `game_id`, `player_name?`, `event_type?` | Événements horodatés (mm:ss depuis le début du replay), 60 au maximum. `event_type` : `goal`, `assist`, `shot`, `save`, `demo_done`, `demo_taken`. |
 | `get_player_heatmap` | `game_id`, `player_name` | Temps passé en zone défensive, milieu, offensive (%). |
+| `analyze_player_across_matches` | `player_name`, `team_size?`, `last_n?` (1 à 20, défaut 20) | Style de jeu d'un joueur agrégé sur plusieurs parties (totaux, moyennes, par partie, tendance). Voir [cross-match-analysis.md](cross-match-analysis.md). |
 | `suggest_training` | `focus_areas` (1 à 3) | Entraînements (3 au maximum). Axes : `boost`, `positioning`, `rotation`, `defense`, `shooting`, `speed`, `aerials`, `ball_control`. |
 
 ### Brancher un agent

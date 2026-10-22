@@ -3,6 +3,7 @@ import re
 import shutil
 import threading
 import uuid
+from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -214,6 +215,28 @@ def get_game_tracks(game_id: str) -> MatchTracks | None:
         duration_seconds=stats_file.match.duration_seconds,
         pads=map_file.pads,
     )
+
+
+def iter_game_reports(team_size: int | None = None) -> Iterator[tuple[str, GameReport]]:
+    """(game_id, report) of every readable imported game, optionally only those of a given team size."""
+    if not config.GAMES_DIR.is_dir():
+        return
+    try:
+        folders = sorted(config.GAMES_DIR.iterdir(), key=lambda p: p.name)
+    except OSError:
+        return
+    for folder in folders:
+        if folder.name.startswith(".tmp-") or not GAME_ID_PATTERN.fullmatch(folder.name):
+            continue
+        try:
+            report = get_game_report(folder.name)
+        except (OSError, ValueError):
+            continue
+        if report is None:
+            continue
+        if team_size is not None and report.match.team_size != team_size:
+            continue
+        yield folder.name, report
 
 
 def get_game_report(game_id: str) -> GameReport | None:
