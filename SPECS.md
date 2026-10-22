@@ -97,13 +97,18 @@ Le quatrième bloc, « Style de jeu », affiche le radar décrit dans « Graphiq
 La section « Déroulé » de la sidebar regroupe les écrans qui présentent le déroulé de la partie.
 
 #### Écran Heatmaps
-L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ».
+L'écran Heatmaps présente, sous forme de cartes de chaleur sur le terrain, les déplacements des acteurs de la partie sélectionnée. Sa page s'intitule « Heatmaps ». Voir [#45](https://github.com/emocio-tech/RL-Coach/issues/45).
 
-Tant qu'aucun joueur n'est sélectionné dans le menu du header, la page contient un seul bloc, « Déplacements du ballon ». Une fois un joueur sélectionné, elle contient deux blocs côte à côte : « Déplacements du joueur », à gauche, et « Déplacements du ballon », à droite.
+La page contient deux blocs côte à côte : « Déplacements du ballon », à gauche, et « Déplacements du joueur », à droite. Tant qu'aucun joueur n'est sélectionné dans le menu du header, seul le bloc du ballon est affiché ; il garde alors la même place et la même taille que lorsqu'un joueur est sélectionné. Sur une fenêtre étroite, les blocs s'affichent l'un sous l'autre, le ballon en premier.
 
-Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de celui de Rocket League, avec les deux cages : la cage bleue à gauche, la cage orange à droite. Une carte de chaleur est superposée au terrain : plus une zone est fréquentée pendant toute la durée de la partie, plus sa couleur est intense. La heatmap du joueur prend la couleur de son équipe, celle du ballon a une couleur distincte de celles des équipes.
+Chaque bloc affiche une vue de dessus du terrain, aux proportions réelles de celui de Rocket League, avec les deux cages : la cage bleue à gauche, la cage orange à droite. Une carte de chaleur est superposée au terrain : plus une zone est fréquentée pendant la partie, plus sa couleur est vive et chaude. Le dégradé est continu, sans cases visibles. Les moments où le ballon reste immobile depuis au moins 2 secondes, comme le compte à rebours avant un engagement ou le ballon resté au fond de la cage après un but, ne sont comptés ni pour le ballon ni pour les joueurs.
 
-Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
+Chaque heatmap a sa propre échelle de couleurs :
+- le ballon, du bleu sombre du terrain au cyan, au vert, au jaune puis au rouge, comme une caméra thermique ;
+- un joueur de l'équipe bleue, du bleu sombre du terrain à un turquoise-vert lumineux ;
+- un joueur de l'équipe orange, d'un brun-rouge sombre au rouge, à l'orange puis à un jaune-orangé vif.
+
+Chaque carte est comparée à elle-même : une même couleur n'a pas la même valeur d'une carte à l'autre. Pour chaque heatmap, la seule légende est l'échelle de couleur, de « Peu de passage » à « Beaucoup de passage ».
 
 Les positions utilisées proviennent de `map.json`.
 
@@ -158,6 +163,8 @@ Les positions utilisées proviennent de `map.json`.
 ## Maquettes
 Les maquettes de l'écran d'accueil, de l'écran Vue d'ensemble (avec et sans joueur sélectionné), de la frise de l'écran Replay et de ses tooltips, de l'écran Positionnement (avec un joueur sélectionné) et de l'écran Heatmaps (avec et sans joueur sélectionné) sont consultables ici : https://claude.ai/artifact/PjCxBTEKrxpNYJ88fa77kD
 
+Pour l'écran Heatmaps, la maquette montre le joueur à gauche et le ballon à droite, avec d'anciennes couleurs : l'ordre des blocs et les échelles de couleur décrits dans la section « Écran Heatmaps » font foi.
+
 ## Statistiques de la partie
 Une fois un replay importé, l'application affiche les statistiques de la partie, lues depuis les fichiers JSON. Voir [#3](https://github.com/emocio-tech/RL-Coach/issues/3) et [#4](https://github.com/emocio-tech/RL-Coach/issues/4).
 
@@ -189,6 +196,7 @@ Une bulle de discussion ronde est affichée en bas à droite de l'écran, sur to
 - L'utilisateur envoie son message avec le bouton « Envoyer » ou la touche Entrée. L'envoi est impossible si le champ est vide ou si une réponse est en cours. La réponse s'affiche en une fois.
 - Les 20 derniers messages sont pris en compte, chacun limité à 2000 caractères.
 - Quand une partie est ouverte, le coach s'appuie sur ses statistiques (résumé du match, statistiques d'un joueur, comparaison des joueurs, analyse du style de jeu d'un joueur sur plusieurs parties importées, voir [#46](https://github.com/emocio-tech/RL-Coach/issues/46)) et ne donne aucun chiffre qu'il n'a pas lu. Il tient compte du joueur sélectionné.
+- Quand l'utilisateur demande sa heatmap, le coach affiche dans le panneau la carte « Déplacements du joueur » de l'écran Heatmaps : les mêmes données et les mêmes couleurs que sur la page. Voir [#45](https://github.com/emocio-tech/RL-Coach/issues/45).
 - Sans partie ouverte, le coach donne uniquement des conseils généraux, sans statistiques.
 - Le coach refuse les sujets sans rapport avec Rocket League.
 - En cas de problème (coach non configuré, indisponible ou trop lent), un message d'erreur en français s'affiche dans le panneau.
@@ -243,5 +251,6 @@ Le serveur est en lecture seule : il n'importe ni ne supprime de partie. Il n'of
 | 18 | 2026-10-21 16:42 | TatouGou | issue-12-create-mcp-server |
 | 19 | 2026-10-22 10:44 | TatouGou | issue-47-llm-call-logs |
 | 20 | 2026-10-22 11:04 | Dimitri FORT | issue-46-cross-match-analysis-tool |
+| 21 | 2026-10-22 11:11 | iwao | issue-45-heatmaps-page |
 
 </details>

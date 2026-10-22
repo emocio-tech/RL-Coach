@@ -32,3 +32,7 @@ export function getReplayStats(id) {
 export function getReplayTracks(id) {
   return request(`/replays/${id}/tracks`);
 }
+
+export function getReplayHeatmaps(id) {
+  return request(`/replays/${id}/heatmaps`);
+}

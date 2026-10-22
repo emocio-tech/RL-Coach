@@ -454,3 +454,16 @@ td.strong { font-weight: 700; }
 .timeline-playhead { position: absolute; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: #fff; box-shadow: 0 0 8px rgba(255, 255, 255, 0.9); transform: translateX(-1.5px); }
 .timeline-event-click { cursor: pointer; }
 .timeline-event-click:hover { transform: translateX(-50%) scale(1.25); }
+
+/* Heatmaps page: one or two cards side by side (Heatmaps mockup) */
+/* Two equal columns, ball on the left and player on the right. A card alone (no player selected) stays in the left
+   column, so the ball card has the same size with or without a player. One column when the window is narrow. */
+.heatmap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: stretch; }
+.heatmap-grid > * { min-width: 0; }
+@media (max-width: 1100px) { .heatmap-grid { grid-template-columns: minmax(0, 1fr); } }
+.heatmap-panel { gap: 16px; }
+.heatmap-panel .heatmap-sub { font-size: 15px; min-height: 22px; gap: 8px; }
+.heatmap-panel .heatmap-sub .dot { width: 12px; height: 12px; }
+.heatmap-panel svg { display: block; width: 100%; height: auto; }
+.heatmap-panel .heatmap-legend { font-size: 13px; gap: 8px 16px; }
+.heatmap-panel .heatmap-scale { width: 120px; height: 12px; }

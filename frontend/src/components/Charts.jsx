@@ -3,6 +3,8 @@ import {
   FULL_VIEW, H, MID, TICK_Y, W, X0, X1,
   areaPath, distancePaths, distanceScale, fillGaps, lineSegments, timeTicks,
 } from "./chartGeometry.js";
+import { TEAM_NAMES } from "./Layout.jsx";
+import { FIELD, FIELD_OUTLINE, buildHeatImage, dotFor, rampFor, rampGradient } from "./heatmapGeometry.js";
 import { sortPlayers } from "./playerOrder.js";
 import { useChartZoom } from "./useChartZoom.js";
 
@@ -121,72 +123,46 @@ export function DistanceChart({ distance, sampleSeconds, view = FULL_VIEW, onVie
   );
 }
 
-// "Déplacements du joueur" block of the Heatmaps screen (SPECS.md mockup), reused in the chat.
-// heatmap.counts[xCell][yCell]: the long axis of the field (y, blue goal at its negative end) runs left to right,
-// blue goal on the left and orange goal on the right. The heat takes the colour of the player's team.
-const HEAT_RAMPS = [
-  [[21, 87, 224], [77, 141, 255], [220, 232, 255]], // blue team
-  [[184, 90, 0], [255, 138, 31], [255, 232, 204]], // orange team
-];
-const TEAM_DOTS = ["#4d8dff", "#ff8a1f"];
-const TEAM_NAMES = ["Équipe bleue", "Équipe orange"];
-// Field drawn at 0.045 px per unit (10240 x 8192) in a 580 x 410 view.
-const FIELD = { x0: 59.6, y0: 20.7, w: 460.8, h: 368.6 };
-const FIELD_OUTLINE = "111.4,20.7 468.6,20.7 520.4,72.5 520.4,337.5 468.6,389.3 111.4,389.3 59.6,337.5 59.6,72.5";
-
-const toRgb = (color) => `rgb(${color.map(Math.round).join(",")})`;
-const blend = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
-const heatColor = (ramp, t) =>
-  t < 0.5 ? toRgb(blend(ramp[0], ramp[1], t / 0.5)) : toRgb(blend(ramp[1], ramp[2], (t - 0.5) / 0.5));
-
-// Heat cells (only the ones that are visible), computed once per heatmap and not at every re-render of the chat.
-function buildHeatCells(counts, ramp) {
-  let max = 0;
-  for (const row of counts) for (const count of row) if (count > max) max = count;
-  const cells = [];
-  if (!max) return { max, cells };
-
-  const cw = FIELD.w / counts[0].length; // columns run along the long axis of the field
-  const ch = FIELD.h / counts.length;
-  counts.forEach((row, ix) =>
-    row.forEach((count, iy) => {
-      const t = count / max;
-      if (t <= 0.04) return;
-      cells.push(
-        <rect
-          key={`${ix}-${iy}`}
-          x={(FIELD.x0 + iy * cw).toFixed(2)}
-          y={(FIELD.y0 + ix * ch).toFixed(2)}
-          width={(cw + 0.5).toFixed(2)}
-          height={(ch + 0.5).toFixed(2)}
-          fill={heatColor(ramp, t)}
-          fillOpacity={Math.min(0.95, 0.15 + 0.85 * t ** 0.7).toFixed(2)}
-        />
-      );
-    })
-  );
-  return { max, cells };
+// PNG data URL of the heat covering the field (null when there is no data), drawn per pixel on a canvas.
+function heatImageUrl(counts, ramp) {
+  const { max, width, height, data } = buildHeatImage(counts, ramp);
+  if (!max) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext("2d").putImageData(new ImageData(data, width, height), 0, 0);
+  return canvas.toDataURL("image/png");
 }
 
-function HeatmapChartView({ player, team, heatmap }) {
+// "Déplacements du joueur" / "Déplacements du ballon" blocks of the Heatmaps screen (SPECS.md mockup), the player one reused in the chat.
+// heatmap.counts[xCell][yCell]: the long axis of the field (y, blue goal at its negative end) runs left to right,
+// blue goal on the left and orange goal on the right. The heat takes the colour of the player's team.
+// Props: title / subtitle override the heading and the line below it (default: player and team);
+// variant "ball" uses the thermal ramp and no team dot; bare renders the full-size card of the Heatmaps page
+// instead of the compact chat block.
+function HeatmapChartView({ player, team, heatmap, title = "Déplacements du joueur", subtitle, variant, bare = false }) {
   const uid = useId().replace(/:/g, "");
-  const ramp = HEAT_RAMPS[team] ?? HEAT_RAMPS[0];
-  const dot = TEAM_DOTS[team] ?? TEAM_DOTS[0];
-  const { max, cells } = useMemo(() => buildHeatCells(heatmap.counts, ramp), [heatmap, ramp]);
-  if (!max) return <p className="empty">Pas de données de position pour {player}.</p>;
+  const isBall = variant === "ball";
+  const ramp = rampFor(team, variant);
+  const heatUrl = useMemo(() => heatImageUrl(heatmap.counts, ramp), [heatmap, ramp]);
+  const subject = isBall ? "du ballon" : `de ${player}`;
+  if (!heatUrl) return <p className="empty">Pas de données de position {isBall ? "pour le ballon" : `pour ${player}`}.</p>;
+
+  const sub = subtitle ?? `${player} · ${TEAM_NAMES[team] ?? TEAM_NAMES[0]}`;
 
   return (
-    <section className="heatmap-card" aria-labelledby={`${uid}-title`}>
-      <h3 id={`${uid}-title`} className="title heatmap-title">Déplacements du joueur</h3>
+    <section className={bare ? "card heatmap-panel" : "heatmap-card"} aria-labelledby={`${uid}-title`}>
+      {bare ? (
+        <h2 id={`${uid}-title`} className="title card-title">{title}</h2>
+      ) : (
+        <h3 id={`${uid}-title`} className="title heatmap-title">{title}</h3>
+      )}
       <span className="heatmap-sub">
-        <i className="dot" style={{ background: dot }} />
-        {player} · {TEAM_NAMES[team] ?? TEAM_NAMES[0]}
+        {!isBall && <i className="dot" style={{ background: dotFor(team) }} />}
+        {sub}
       </span>
-      <svg viewBox="0 0 580 410" role="img" aria-label={`Heatmap des déplacements de ${player} sur le terrain`}>
+      <svg viewBox="0 0 580 410" role="img" aria-label={`Heatmap des déplacements ${subject} sur le terrain`}>
         <defs>
-          <filter id={`${uid}-blur`} x="-10%" y="-10%" width="120%" height="120%">
-            <feGaussianBlur stdDeviation="9" />
-          </filter>
           <clipPath id={`${uid}-clip`}>
             <polygon points={FIELD_OUTLINE} />
           </clipPath>
@@ -194,7 +170,7 @@ function HeatmapChartView({ player, team, heatmap }) {
         <rect width="580" height="410" rx="18" fill="#0a1030" />
         <polygon points={FIELD_OUTLINE} fill="#0e1640" />
         <g clipPath={`url(#${uid}-clip)`}>
-          <g filter={`url(#${uid}-blur)`}>{cells}</g>
+          <image href={heatUrl} x={FIELD.x0} y={FIELD.y0} width={FIELD.w} height={FIELD.h} preserveAspectRatio="none" />
         </g>
         <g fill="none" stroke="#9db8ff" strokeOpacity="0.6" strokeWidth="2" aria-hidden="true">
           <polygon points={FIELD_OUTLINE} />
@@ -206,11 +182,7 @@ function HeatmapChartView({ player, team, heatmap }) {
       </svg>
       <div className="heatmap-legend">
         Peu de passage
-        <span
-          className="heatmap-scale"
-          aria-hidden="true"
-          style={{ background: `linear-gradient(90deg, ${toRgb(ramp[0])}, ${toRgb(ramp[1])}, ${toRgb(ramp[2])})` }}
-        />
+        <span className="heatmap-scale" aria-hidden="true" style={{ background: rampGradient(ramp) }} />
         Beaucoup de passage
       </div>
     </section>

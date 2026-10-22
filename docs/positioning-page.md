@@ -81,7 +81,7 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
 - **Durée minimale visible.** Le zoom s'arrête à 2 % de la partie (`MIN_VIEW_SPAN`).
 - **Position écrêtée.** Les valeurs de y sont ramenées dans ±5120 pour le dessin. Une balle dans le fond d'une cage atteint donc le bord du graphique. La constante est dupliquée dans `analysis.py` et `chartGeometry.js`.
 - **Couleur de la courbe de distance.** Elle est fixée à `#5EEAD4`, indépendante de l'équipe. L'équipe est indiquée par la pastille du sous-titre.
-- **Pas de page Heatmaps.** `SPECS.md` (écran Heatmaps, et lien dans la sidebar de la section « Déroulé ») la décrit, mais elle n'est pas implémentée : `Layout.jsx` ne propose que « Replay » et « Positionnement », et `App.jsx` ne route aucune page de ce nom. Le composant `HeatmapChart` existe dans `Charts.jsx`, mais il n'est utilisé que par `ChatBubble.jsx`.
+- **Page Heatmaps séparée.** La page Heatmaps (dernière entrée de la section « Déroulé ») est décrite dans `docs/heatmaps-page.md`.
 
 ### Périmètre et limites
 - **Inclus** :
@@ -90,7 +90,7 @@ Aucune écriture et aucun appel externe : la page est de l'affichage pur, en SVG
   - `BallPositionChart`, `DistanceChart` et les helpers de `chartGeometry.js`.
   - Retrait du bloc Momentum de la Vue d'ensemble.
 - **Exclu** :
-  - Page Heatmaps (voir plus haut).
+  - Page Heatmaps (voir `docs/heatmaps-page.md`).
   - Comparaison de plusieurs joueurs sur un même graphique.
   - Survol ou tooltips sur les graphiques.
   - Zoom sur l'axe vertical : seul l'axe du temps se zoome.

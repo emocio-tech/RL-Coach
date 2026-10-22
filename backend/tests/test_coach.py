@@ -738,37 +738,37 @@ def test_show_heatmap_tool_requires_player_name():
     assert tool["function"]["parameters"]["required"] == ["player_name"]
 
 
-# ---------- storage.get_player_map ----------
+# ---------- storage.get_player_heatmap ----------
 
 
-def test_get_player_map(game):
-    player_map = storage.get_player_map(game, "Alice")
+def test_get_player_heatmap(game):
+    player_map = storage.get_player_heatmap(game, "Alice")
 
     assert player_map.name == "Alice"
     assert player_map.team == 0
     assert player_map.heatmap.counts == _stored_counts(game, "Alice")
 
 
-def test_get_player_map_case_and_spaces_insensitive(game):
-    assert storage.get_player_map(game, "  bob ").name == "Bob"
+def test_get_player_heatmap_case_and_spaces_insensitive(game):
+    assert storage.get_player_heatmap(game, "  bob ").name == "Bob"
 
 
-def test_get_player_map_invalid_game_id(game):
-    assert storage.get_player_map("../x", "Alice") is None
+def test_get_player_heatmap_invalid_game_id(game):
+    assert storage.get_player_heatmap("../x", "Alice") is None
 
 
-def test_get_player_map_missing_map_file(game):
+def test_get_player_heatmap_missing_map_file(game):
     (config.GAMES_DIR / game / config.MAP_FILENAME).unlink()
 
-    assert storage.get_player_map(game, "Alice") is None
+    assert storage.get_player_heatmap(game, "Alice") is None
 
 
-def test_get_player_map_unknown_game(games_dir):
-    assert storage.get_player_map("Missing_Game_1", "Alice") is None
+def test_get_player_heatmap_unknown_game(games_dir):
+    assert storage.get_player_heatmap("Missing_Game_1", "Alice") is None
 
 
-def test_get_player_map_player_absent(game):
-    assert storage.get_player_map(game, "Zed") is None
+def test_get_player_heatmap_player_absent(game):
+    assert storage.get_player_heatmap(game, "Zed") is None
 
 
 # ---------- build_system_prompt: show_heatmap ----------

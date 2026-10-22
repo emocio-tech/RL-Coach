@@ -123,12 +123,13 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 ### Contenu de `map.json` (`MapFile`)
 - `replay_id`.
 - `players[]` : `name`, `team`, `heatmap`, `track`.
-  - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon de 0,2 s. Les positions hors bornes sont ramenées dans la cellule de bord.
+  - `heatmap` : bornes ±4096 en x et ±5120 en y, `counts[20][26]` indexé `counts[ix][iy]`. Chaque unité représente un échantillon de 0,2 s. Les positions hors bornes sont ramenées dans la cellule de bord. Les échantillons où le ballon est immobile depuis au moins 2 s (compte à rebours de l'engagement, ballon figé dans la cage après un but) ne sont pas comptés ; les `track` gardent tous les échantillons.
   - `track` : tableaux colonnaires de même longueur `t`, `x`, `y`, `z`, `speed`, `boost`, `qx`, `qy`, `qz`, `qw` (`PlayerTrack`, `backend/app/schemas/replay.py`).
     - `qx`, `qy`, `qz`, `qw` donnent l'orientation de la voiture : un quaternion unitaire dans le repère du jeu, avec la composante `w` en dernier.
     - Ces valeurs sont `null` quand la voiture est inconnue ou n'a pas de rotation.
     - Elles sont renseignées même quand la voiture est immobile ou endormie, alors que `speed` peut être `null`.
 - `ball` : `t`, `x`, `y`, `z`, avec les mêmes `t` que les joueurs.
+- `ball_heatmap` : même format que la `heatmap` d'un joueur, calculée à partir de `ball.x` et `ball.y`. Ce champ est optionnel : les fichiers importés avant son ajout ne l'ont pas et restent valides. `GET /api/replays/{game_id}/heatmaps` relit alors les valeurs stockées, ou recalcule toutes les heatmaps depuis les trajectoires à chaque appel si `ball_heatmap` est absent (voir `docs/heatmaps-page.md`).
 - **Échantillonnage** : `FRAME_SAMPLE_HZ = 5` (pas de 0,2 s). `t` est en secondes depuis la première frame. Une valeur vaut `null` quand la voiture ou la balle n'a pas de position connue.
 - **Unités** :
   - Les positions sont en unités du jeu, arrondies à 0,1.

@@ -36,7 +36,7 @@ Quand le joueur Pseudo est démoli (valeurs `null`), sa voiture disparaît de la
 | `game_id` | chemin | oui | Nom d'un dossier de `data/games/` respectant `GAME_ID_PATTERN` (`backend/app/services/storage.py`). |
 
 ### Sorties
-`MatchTracks` (`backend/app/schemas/replay.py`), construit par `storage.get_game_tracks` à partir de `stats.json` et `map.json`, sans les heatmaps.
+`MatchTracks` (`backend/app/schemas/replay.py`), construit par `storage.get_game_tracks` à partir de `stats.json` et `map.json`, sans les heatmaps (elles passent par `GET /api/replays/{game_id}/heatmaps`, voir `docs/heatmaps-page.md`).
 
 | Champ | Contenu |
 |---|---|
