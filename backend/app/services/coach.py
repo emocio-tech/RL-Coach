@@ -85,8 +85,14 @@ def build_system_prompt(game_id: str | None, selected_player: str | None) -> str
     )
     if game_id:
         lines.append(
-            f"Une partie est ouverte : game_id = {json.dumps(game_id, ensure_ascii=False)} (utilisé par défaut si "
-            "l'argument game_id est omis). Utilise get_match_summary et get_player_stats pour l'analyser."
+            f"Une partie est ouverte : game_id = {json.dumps(game_id, ensure_ascii=False)} (utilisé si l'argument "
+            "game_id est omis). Utilise get_match_summary et get_player_stats pour l'analyser."
+        )
+        lines.append(
+            "Si le joueur parle d'une autre partie que la partie ouverte (carte, mode, date, adversaires, « mon match "
+            "d'hier »...), appelle list_games (filtre player_name possible), choisis la partie correspondante et passe "
+            "son game_id à chaque outil de partie. Ne laisse game_id vide que si la question porte sur la partie "
+            "ouverte. Chaque résultat d'outil contient le game_id analysé : vérifie qu'il correspond à la partie voulue."
         )
         lines.append(
             "Quand le joueur demande une heatmap ou sa carte de positionnement, appelle show_heatmap avec son pseudo : "
@@ -145,7 +151,10 @@ def build_system_prompt(game_id: str | None, selected_player: str | None) -> str
 
 GAME_ID_PROPERTY = {
     "type": "string",
-    "description": "Identifiant de la partie (voir list_games). Par défaut : la partie ouverte.",
+    "description": (
+        "Identifiant de la partie (voir list_games). À renseigner dès que la question porte sur une autre partie "
+        "que la partie ouverte ; à omettre uniquement pour analyser la partie ouverte."
+    ),
 }
 
 TOOLS = [
@@ -493,7 +502,8 @@ def _run_tool(
     if error:
         return error
     if name == "show_heatmap":
-        return _show_heatmap(game_id, arguments, selected_player, heatmaps)
+        result = _show_heatmap(game_id, arguments, selected_player, heatmaps)
+        return result if "error" in result else {"game_id": game_id, **result}
     report = storage.get_game_report(game_id, include_match3d=False)  # the LLM never reads 3dmatch.json
     if report is None:
         return {"error": "Partie introuvable."}
@@ -501,16 +511,18 @@ def _run_tool(
     if name == "get_match_summary":
         basic_fields = set(PlayerStats.model_fields)
         return {
+            "game_id": game_id,
             "match": report.match.model_dump(),
             "players": [p.stats.model_dump(include=basic_fields) for p in report.players],
         }
     if name == "get_match_events":
-        return _match_events(report, arguments)
+        result = _match_events(report, arguments)
+        return result if "error" in result else {"game_id": game_id, **result}
 
     player, error = _find_player(report, arguments, selected_player)
     if error:
         return error
-    return _player_payload(player)
+    return {"game_id": game_id, **_player_payload(player)}
 
 
 def _choice_prompt(game_id: str) -> ChoicePrompt | None:
