@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listReplays } from "../api/client.js";
+import usePresence from "./usePresence.js";
 
 const dateFormat = new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -8,7 +9,9 @@ export default function ReplayPicker({ onOpen }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
+  const { mounted, state } = usePresence(open);
   const [selectedId, setSelectedId] = useState(null);
+  const [opening, setOpening] = useState(false);
   const rootRef = useRef(null);
 
   useEffect(() => {
@@ -30,6 +33,15 @@ export default function ReplayPicker({ onOpen }) {
     document.addEventListener("mousedown", handlePointerDown);
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [open]);
+
+  async function handleOpen() {
+    setOpening(true);
+    try {
+      await onOpen(selected.id);
+    } finally {
+      setOpening(false);
+    }
+  }
 
   const selected = replays.find((r) => r.id === selectedId);
   const empty = !loading && !error && replays.length === 0;
@@ -54,8 +66,8 @@ export default function ReplayPicker({ onOpen }) {
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        {open && (
-          <div role="listbox" aria-label="Parties déjà importées" className="picker-list">
+        {mounted && (
+          <div role="listbox" aria-label="Parties déjà importées" className="picker-list" data-state={state}>
             {replays.map((r) => (
               <button
                 key={r.id}
@@ -86,12 +98,22 @@ export default function ReplayPicker({ onOpen }) {
         )}
       </div>
       {error && <p className="alert" role="alert">{error}</p>}
-      <button type="button" className="cta cta-orange" disabled={!selected} onClick={() => onOpen(selected.id)}>
+      <button
+        type="button"
+        className={`cta cta-orange${opening ? " busy" : ""}`}
+        disabled={!selected || opening}
+        aria-busy={opening}
+        onClick={handleOpen}
+      >
         Voir les stats
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 12h14" />
-          <path d="M13 6l6 6-6 6" />
-        </svg>
+        {opening ? (
+          <div className="spinner spinner-inline" role="status" aria-label="Ouverture en cours" />
+        ) : (
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 12h14" />
+            <path d="M13 6l6 6-6 6" />
+          </svg>
+        )}
       </button>
     </>
   );

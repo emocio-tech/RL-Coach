@@ -57,7 +57,7 @@ function Recap({ match, player }) {
               </span>
             </div>
             <div>
-              <span className="car-pill">
+              <span className={`car-pill${player.stats.team === 1 ? " orange" : ""}`}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M5 17h14" />
                   <path d="M3 17v-4l2-5h14l2 5v4" />

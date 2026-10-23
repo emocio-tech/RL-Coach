@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { groupByTeam } from "./playerOrder.js";
+import usePresence from "./usePresence.js";
 
 export const TEAM_NAMES = { 0: "Équipe bleue", 1: "Équipe orange" };
 const TEAM_DOT = { 0: "var(--blue-light)", 1: "var(--orange)" };
@@ -17,6 +18,7 @@ function Logo() {
 
 function PlayerSelect({ players, selected, onSelect }) {
   const [open, setOpen] = useState(false);
+  const { mounted, state } = usePresence(open);
   const current = players.find((p) => p.name === selected);
 
   function pick(name) {
@@ -41,10 +43,10 @@ function PlayerSelect({ players, selected, onSelect }) {
             {current ? current.name : "Sélectionne un joueur"}
           </span>
         </span>
-        <span aria-hidden="true">▾</span>
+        <span className="select-btn-chevron" aria-hidden="true">▾</span>
       </button>
-      {open && (
-        <div role="listbox" aria-label="Joueurs de la partie" className="listbox">
+      {mounted && (
+        <div role="listbox" aria-label="Joueurs de la partie" className="listbox" data-state={state}>
           {groupByTeam(players).map((group) => (
             <div key={group.team ?? "none"} role="group" aria-labelledby={`team-${group.team ?? "none"}`} className="option-group">
               <span
@@ -64,9 +66,7 @@ function PlayerSelect({ players, selected, onSelect }) {
                   onClick={() => pick(p.name)}
                 >
                   <span className="dot" style={{ background: TEAM_DOT[p.team] }} />
-                  <span className="option-name">{p.name}</span>
-                  <span className="option-team">{TEAM_NAMES[p.team]}</span>
-                </button>
+                  <span className="option-name">{p.name}</span>                </button>
               ))}
             </div>
           ))}
@@ -104,7 +104,7 @@ function NavLink({ id, page, onNavigate, disabled, children }) {
 
 export default function Layout({ page, onNavigate, players, selectedPlayer, onSelectPlayer, children }) {
   return (
-    <div className="app">
+    <div className="app app-shell">
       <header className="header">
         <Logo />
         <PlayerSelect players={players} selected={selectedPlayer} onSelect={onSelectPlayer} />
