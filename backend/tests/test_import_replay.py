@@ -219,7 +219,9 @@ def test_import_replay_stores_only_basename_not_full_path(games_dir, mock_parse,
 
 def test_import_replay_stats_replay_id_matches_replay(games_dir, mock_parse, replay_file):
     coach.import_replay(str(replay_file))
-    assert _stats_of(games_dir, FOLDER_NAME)["replay_id"] == REPLAY_ID
+    stats_data = _stats_of(games_dir, FOLDER_NAME)
+    assert stats_data["replay_id"] == FOLDER_NAME
+    assert stats_data["source_id"] == REPLAY_ID
 
 
 # --- storage.import_replay_bytes ---

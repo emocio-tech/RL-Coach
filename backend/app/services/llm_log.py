@@ -49,7 +49,7 @@ def context_chars(conversation: list[dict], tools: list[dict] | None) -> dict[st
 
 
 def game_files(tool_name: str, game_id: str | None, arguments_json: str | None = None) -> list[str]:
-    """Files of data/games read by a tool (stats.json, plus 3dmatch.json when the game has one).
+    """Files of data/games read by a tool (heatmap.json for show_heatmap, stats.json for the others).
 
     The game is the game_id of the tool arguments, else `game_id` (the open game); an invalid id gives no file."""
     if tool_name in TOOLS_WITHOUT_FILES:
@@ -63,11 +63,10 @@ def game_files(tool_name: str, game_id: str | None, arguments_json: str | None =
         game_id = given.strip()
     if not game_id or not isinstance(game_id, str) or not storage.GAME_ID_PATTERN.fullmatch(game_id):
         return []
-    return [
-        f"data/games/{game_id}/{filename}"
-        for filename in (config.STATS_FILENAME, config.MATCH3D_FILENAME)
-        if (config.GAMES_DIR / game_id / filename).is_file()
-    ]
+    filename = config.HEATMAP_FILENAME if tool_name == "show_heatmap" else config.STATS_FILENAME
+    if not (config.GAMES_DIR / game_id / filename).is_file():
+        return []
+    return [f"data/games/{game_id}/{filename}"]
 
 
 def _tokens(usage, name: str) -> int:

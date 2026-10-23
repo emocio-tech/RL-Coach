@@ -100,9 +100,14 @@ def test_log_call_lists_tools_and_files_used(llm, game, logs_dir):
     log = _read_log(logs_dir)
     assert log.count("=== ") == 2
     assert "outil get_match_summary({})" in log
-    assert f"data/games/{GAME_ID}/stats.json, data/games/{GAME_ID}/3dmatch.json" in log
+    assert f"fichiers lus : data/games/{GAME_ID}/stats.json\n" in log
+    assert "3dmatch.json" not in log
     assert "résultats_outils=0" in log.split("=== ")[1]
     assert "résultats_outils=0" not in log.split("=== ")[2]
+
+
+def test_game_files_show_heatmap_reads_heatmap_json_only(game):
+    assert llm_log.game_files("show_heatmap", game) == [f"data/games/{game}/heatmap.json"]
 
 
 def test_log_call_tool_without_files(llm, game, logs_dir):

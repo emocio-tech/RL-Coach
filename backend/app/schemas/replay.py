@@ -91,7 +91,8 @@ class MatchEvent(BaseModel):
 
 
 class StatsFile(BaseModel):
-    replay_id: str
+    replay_id: str  # name of the game folder
+    source_id: str | None = None  # raw Id of the replay (None in games imported before this field existed)
     original_filename: str
     match: MatchStats
     players: list[PlayerFullStats]

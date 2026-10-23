@@ -638,6 +638,7 @@ def build_match_files(
 
     stats_file = StatsFile(
         replay_id=replay_id,
+        source_id=replay_id,
         original_filename=original_filename,
         match=match,
         players=full_players,
