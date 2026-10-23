@@ -1331,7 +1331,7 @@ def test_run_tool_get_match_events_combined_filters(events_game):
 def test_run_tool_get_match_events_filters_without_match_return_empty_list_without_note(events_game):
     result = _events_result(events_game, player_name="Bob", event_type="goal")
 
-    assert result == {"events": []}
+    assert result == {"game_id": events_game, "events": []}
 
 
 def test_run_tool_get_match_events_null_filters_mean_no_filter(events_game):
@@ -1366,7 +1366,7 @@ def test_run_tool_get_match_events_invalid_event_type(events_game, event_type):
 def test_run_tool_get_match_events_game_without_events_gives_unavailable_note(write_events):
     game_id = write_events([])
 
-    assert _events_result(game_id) == {"events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
+    assert _events_result(game_id) == {"game_id": game_id, "events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
 
 
 def test_run_tool_get_match_events_old_stats_file_without_events_key(game):
@@ -1375,7 +1375,7 @@ def test_run_tool_get_match_events_old_stats_file_without_events_key(game):
     data.pop("events", None)
     stats_path.write_text(json.dumps(data), encoding="utf-8")
 
-    assert _events_result(game) == {"events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
+    assert _events_result(game) == {"game_id": game, "events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
 
 
 def test_run_tool_get_match_events_unavailable_note_with_valid_filters(write_events):
@@ -1383,7 +1383,7 @@ def test_run_tool_get_match_events_unavailable_note_with_valid_filters(write_eve
 
     result = _events_result(game_id, player_name="Alice", event_type="goal")
 
-    assert result == {"events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
+    assert result == {"game_id": game_id, "events": [], "note": coach.EVENTS_UNAVAILABLE_NOTE}
 
 
 def test_run_tool_get_match_events_unknown_player_checked_before_unavailable_note(write_events):
