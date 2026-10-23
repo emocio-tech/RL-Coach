@@ -1723,11 +1723,68 @@ def test_chat_suggest_training_runs_without_game_id(llm):
         _response(content="Voici ton plan."),
     ])
 
-    result = coach.chat(_user(), None, None)
+    result = coach.chat(_user("Propose-moi des exercices"), None, None)
 
     assert result == coach.CoachReply(reply="Voici ton plan.", prompt=None)
     assert len(fake.calls) == 2
     assert "trainings" in json.loads(fake.calls[1]["messages"][-1]["content"])
+
+
+def test_chat_suggest_training_refused_when_not_requested(llm, game):
+    fake = llm([
+        _response(tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost"))]),
+        _response(content="Voici ta réponse."),
+    ])
+
+    coach.chat(_user("Mes stats"), game, "Alice")
+
+    assert "error" in json.loads(fake.calls[1]["messages"][-1]["content"])
+
+
+def test_chat_suggest_training_allowed_after_training_question(llm, game):
+    fake = llm([
+        _response(tool_calls=[_tool_call("t1", "suggest_training", _training_args("boost"))]),
+        _response(content="Voici ton plan."),
+    ])
+    history = [
+        ChatMessage(role="user", content="Mes stats"),
+        ChatMessage(role="assistant", content=f"Conseils. {coach.TRAINING_QUESTION}"),
+        ChatMessage(role="user", content="Oui"),
+    ]
+
+    coach.chat(history, game, "Alice")
+
+    assert "trainings" in json.loads(fake.calls[1]["messages"][-1]["content"])
+
+
+def test_chat_figures_without_tool_call_retries_with_required_tool(llm, game):
+    fake = llm([
+        _response(content="Tu as marqué 3 buts."),
+        _response(tool_calls=[_tool_call("c1", "get_player_stats", json.dumps({"player_name": "Alice"}))]),
+        _response(content="Tu as marqué 1 but."),
+    ])
+
+    result = coach.chat(_user("Et mes buts ?"), game, "Alice")
+
+    assert result.reply == "Tu as marqué 1 but."
+    assert "tool_choice" not in fake.calls[0]
+    assert fake.calls[1]["tool_choice"] == "required"
+
+
+def test_chat_figures_retry_keeps_first_answer_when_provider_rejects_required(llm, game):
+    llm([_response(content="Tu as marqué 3 buts."), _bad_request_error()])
+
+    result = coach.chat(_user("Et mes buts ?"), game, "Alice")
+
+    assert result.reply == "Tu as marqué 3 buts."
+
+
+def test_chat_answer_without_figures_is_not_retried(llm, game):
+    fake = llm([_response(content="Bien joué !")])
+
+    coach.chat(_user("Salut"), game, "Alice")
+
+    assert len(fake.calls) == 1
 
 
 def test_heatmap_reply_same_player_twice_gives_one_line():
