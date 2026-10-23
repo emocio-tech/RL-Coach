@@ -78,12 +78,12 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
   - `Unknown` si `MatchType` est absent ou vide.
   - `replay` si l'Id nettoyé est vide.
 - **Taille d'équipe** : la partie `-<N>v<N>` n'existe que si `TeamSize` est un entier. Elle est omise sinon.
-- **Id absent** : un `uuid4().hex` est généré. Le même id est écrit dans le champ `replay_id` des deux fichiers. Cet id n'est pas nettoyé, contrairement à la partie du nom de dossier.
-- **Collision** : si le dossier existe déjà pour un autre match, le suffixe `_2`, `_3`… est ajouté, jusqu'à 1000 tentatives. Le renommage sert de test de disponibilité. Si le nom reste occupé après 1000 tentatives, une `OSError` est levée. Un chemin sortant de `GAMES_DIR` provoque aussi une `OSError`. Le suffixe ne sert donc plus aux réimports, seulement à deux matchs différents qui donnent le même nom (ex. `Id` différents mais identiques une fois nettoyés par `_sanitize`).
+- **Id absent** : un `uuid4().hex` est généré. Il est écrit tel quel (non nettoyé) dans le champ `source_id` de `stats.json`. Le champ `replay_id` des trois fichiers contient le nom du dossier.
+- **Collision** : si le dossier existe déjà pour un autre match, le suffixe `_2`, `_3`… est ajouté, jusqu'à 1000 tentatives. Le nom libre est choisi avant l'écriture, pour que `replay_id` le reflète. Si le nom reste occupé après 1000 tentatives, une `OSError` est levée. Un chemin sortant de `GAMES_DIR` provoque aussi une `OSError`. Le suffixe ne sert donc plus aux réimports, seulement à deux matchs différents qui donnent le même nom (ex. `Id` différents mais identiques une fois nettoyés par `_sanitize`).
 
 #### Déduplication
 `save_replay` appelle `_store_match` (`backend/app/services/storage.py`), qui s'exécute dans un thread sous le verrou `_STORE_LOCK`.
-- **Clé** : `properties["Id"]` du replay, comparé au `replay_id` brut de `stats.json` (non nettoyé).
+- **Clé** : `properties["Id"]` du replay, comparé au `source_id` brut de `stats.json` (non nettoyé ; les anciens fichiers, sans `source_id`, sont comparés par leur `replay_id`).
 - **Replay déjà présent** : `_find_existing_folder` renvoie le dossier trouvé. La route répond `201` avec son nom, sans créer de dossier ni toucher à `stats.json` (la date d'import, mtime de `stats.json`, reste inchangée). `rrrocket` a quand même été exécuté, car le parsing a lieu avant la recherche.
 - **Recherche** : sur le disque, dans l'ordre alphabétique des noms de dossier : le dossier sans suffixe passe avant `_2`, `_3`. Les dossiers `.tmp-*`, les fichiers et les dossiers sans `stats.json` lisible ou valide sont ignorés.
 - **`3dmatch.json` manquant** : n'empêche pas la détection du doublon, seul `stats.json` compte.
@@ -91,7 +91,7 @@ Format : `<MapName>_<MatchType>-<N>v<N>_<Id>` (`backend/app/services/storage.py`
 - **Concurrence** : le verrou est en mémoire, il protège les imports simultanés d'un même processus uniquement.
 
 ### Contenu de `stats.json` (`StatsFile`)
-- `replay_id` et `original_filename`. Ce dernier est nettoyé : basename, caractères de contrôle retirés, 255 caractères maximum.
+- `replay_id` (nom du dossier), `source_id` (`Id` brut du replay) et `original_filename`. Ce dernier est nettoyé : basename, caractères de contrôle retirés, 255 caractères maximum.
 - `match` : `match_type`, `team_size`, `team0_score`, `team1_score`, `duration_seconds`, `map_name`, `date`. Chaque champ peut être `null`, sauf les deux scores : le replay omet la propriété d'une équipe qui n'a pas marqué, elle vaut alors `0`.
 - `players[]` : un élément par entrée `PlayerStats` du replay.
   - Stats de base : `name`, `team`, `score`, `goals`, `assists` (= passes), `saves`, `shots` (0 si absent).

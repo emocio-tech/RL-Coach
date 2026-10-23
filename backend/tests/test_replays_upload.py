@@ -51,11 +51,12 @@ def test_upload_replay_nominal_returns_201_and_writes_stats_3dmatch_and_heatmap(
     assert [f.name for f in _files(games_dir)] == [replay_id]
     assert sorted(f.name for f in (games_dir / replay_id).iterdir()) == ["3dmatch.json", "heatmap.json", "stats.json"]
     stats_data = _stats_of(games_dir, replay_id)
-    assert stats_data["replay_id"] == REPLAY_ID
+    assert stats_data["replay_id"] == replay_id
+    assert stats_data["source_id"] == REPLAY_ID
     assert stats_data["original_filename"] == "game.replay"
     assert len(stats_data["players"]) == 2
     map_data = _read(games_dir, replay_id, config.MATCH3D_FILENAME)
-    assert map_data["replay_id"] == REPLAY_ID
+    assert map_data["replay_id"] == replay_id
     assert len(map_data["players"]) == 2
     assert len(map_data["ball"]["t"]) > 0
     assert mock_parse == [b"REPLAYDATA"]
@@ -213,8 +214,10 @@ def test_upload_replay_different_replays_same_folder_name_get_suffix(client, gam
     b = _post_id(client, fake_raw, prefix + "2")
     assert b == f"{a}_2"
     assert sorted(f.name for f in _files(games_dir)) == sorted([a, b])
-    assert _stats_of(games_dir, a)["replay_id"] == prefix + "1"
-    assert _stats_of(games_dir, b)["replay_id"] == prefix + "2"
+    assert _stats_of(games_dir, a)["source_id"] == prefix + "1"
+    assert _stats_of(games_dir, b)["source_id"] == prefix + "2"
+    assert _stats_of(games_dir, a)["replay_id"] == a
+    assert _stats_of(games_dir, b)["replay_id"] == b
 
 
 def test_upload_replay_duplicate_of_legacy_suffixed_folder_returns_it(client, games_dir, mock_parse):
@@ -307,7 +310,8 @@ def test_upload_replay_missing_id_generates_unique_name(client, games_dir, monke
     assert len(a) - len(prefix) == 32 and int(a[len(prefix):], 16) >= 0
     assert a != b
     assert len(_files(games_dir)) == 2
-    assert _stats_of(games_dir, a)["replay_id"] == a[len(prefix):]
+    assert _stats_of(games_dir, a)["source_id"] == a[len(prefix):]
+    assert _stats_of(games_dir, a)["replay_id"] == a
 
 
 def test_upload_replay_write_failure_returns_500_and_leaves_nothing(client, games_dir, mock_parse, monkeypatch):
@@ -327,7 +331,7 @@ def test_upload_replay_heatmap_json_matches_heatmaps_of_3dmatch_json(client, gam
     replay_id = _post(client).json()["id"]
     match3d = _read(games_dir, replay_id, config.MATCH3D_FILENAME)
     heatmap = _read(games_dir, replay_id, config.HEATMAP_FILENAME)
-    assert heatmap["replay_id"] == match3d["replay_id"] == REPLAY_ID
+    assert heatmap["replay_id"] == match3d["replay_id"] == replay_id
     assert heatmap["players"] == [
         {"name": p["name"], "team": p["team"], "heatmap": p["heatmap"]} for p in match3d["players"]
     ]

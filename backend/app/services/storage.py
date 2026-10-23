@@ -91,7 +91,7 @@ def _store_match(
 
 
 def _find_existing_folder(replay_id: str) -> Path | None:
-    """Folder already holding this replay (same raw replay_id in stats.json), or None."""
+    """Folder already holding this replay (same raw Id in the source_id of stats.json), or None."""
     if not config.GAMES_DIR.is_dir():
         return None
     try:
@@ -109,7 +109,8 @@ def _find_existing_folder(replay_id: str) -> Path | None:
             )
         except (OSError, ValueError):
             continue
-        if isinstance(data, dict) and data.get("replay_id") == replay_id:
+        # Games imported before source_id existed hold the raw Id in replay_id.
+        if isinstance(data, dict) and data.get("source_id", data.get("replay_id")) == replay_id:
             return folder
     return None
 
@@ -129,33 +130,35 @@ def _folder_name(properties: dict, replay_id: str) -> str:
     return f"{map_name}_{match_type}{size_part}_{_sanitize(replay_id, 'replay')}"
 
 
+def _free_folder_name(folder_name: str, games_dir: Path) -> str:
+    for attempt in range(1, 1001):
+        candidate = folder_name if attempt == 1 else f"{folder_name}_{attempt}"
+        final = config.GAMES_DIR / candidate
+        if final.resolve().parent != games_dir:
+            raise OSError("Invalid replay folder path")
+        if not final.exists():
+            return candidate
+    raise OSError("Could not find a free replay folder name")
+
+
 def _write_match_folder(folder_name: str, stats_file, match3d_file, heatmap_file) -> str:
+    """Write the three files in a new folder; their replay_id is set to the name of that folder."""
     config.GAMES_DIR.mkdir(parents=True, exist_ok=True)
     games_dir = config.GAMES_DIR.resolve()
     tmp = config.GAMES_DIR / f".tmp-{uuid.uuid4().hex}"
     try:
+        name = _free_folder_name(folder_name, games_dir)
         tmp.mkdir()
-        (tmp / config.STATS_FILENAME).write_text(
-            stats_file.model_dump_json(), encoding="utf-8"
-        )
-        (tmp / config.MATCH3D_FILENAME).write_text(
-            match3d_file.model_dump_json(), encoding="utf-8"
-        )
-        (tmp / config.HEATMAP_FILENAME).write_text(
-            heatmap_file.model_dump_json(), encoding="utf-8"
-        )
-        for attempt in range(1, 1001):
-            candidate = folder_name if attempt == 1 else f"{folder_name}_{attempt}"
-            final = config.GAMES_DIR / candidate
-            if final.resolve().parent != games_dir:
-                raise OSError("Invalid replay folder path")
-            try:
-                tmp.rename(final)
-                return candidate
-            except OSError:
-                if not final.exists():
-                    raise
-        raise OSError("Could not find a free replay folder name")
+        for filename, match_file in (
+            (config.STATS_FILENAME, stats_file),
+            (config.MATCH3D_FILENAME, match3d_file),
+            (config.HEATMAP_FILENAME, heatmap_file),
+        ):
+            (tmp / filename).write_text(
+                match_file.model_copy(update={"replay_id": name}).model_dump_json(), encoding="utf-8"
+            )
+        tmp.rename(config.GAMES_DIR / name)
+        return name
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
